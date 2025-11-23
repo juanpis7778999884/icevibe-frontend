@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ice Vibe - Mi Cuenta</title>
+
+    <link rel="stylesheet" href="css/pos-styles.css">
+</head>
+<body>
+    <div class="pos-container">
+        <aside class="pos-sidebar">
+            <div class="pos-logo">
+                <h1>ICE VIBE</h1>
+                <p class="pos-subtitle">MI CUENTA</p>
+            </div>
+            
+            <nav class="pos-nav">
+                <button class="pos-nav-btn active">
+                    <span class="icon">🏠</span>
+                    <span>INICIO</span>
+                </button>
+            </nav>
+            
+            <div class="pos-user-info">
+                <p><strong id="userName">Cliente</strong></p>
+                <button class="pos-logout-btn" onclick="logout()">SALIR</button>
+            </div>
+        </aside>
+        
+        <main class="pos-main">
+            <div class="pos-header">
+                <h2 class="menu-title">BIENVENIDO A ICE VIBE</h2>
+            </div>
+            
+            <div class="pos-content">
+                <div style="flex: 1; padding: 30px; overflow-y: auto; text-align: center;">
+                    <h3 style="color: var(--ice-blue-bright); margin-bottom: 20px;">¡Gracias por ser parte de Ice Vibe!</h3>
+                    <p style="color: var(--text-gray);">Tu cuenta está activa y lista para usar.</p>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+</body>
+</html>

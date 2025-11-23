@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS Mesero - Ice Vibe</title>
+    <link rel="stylesheet" href="css/pos-styles.css">
+</head>
+<body>
+    <div class="pos-container">
+        <!-- Sidebar Izquierdo -->
+        <aside class="pos-sidebar">
+            <div class="pos-logo">
+                <h1>ICE VIBE</h1>
+                <p class="pos-subtitle">PUNTO DE VENTA</p>
+            </div>
+            
+            <nav class="pos-nav">
+                <button class="pos-nav-btn active" onclick="irANuevaOrden()">
+                    <span class="icon">🛒</span>
+                    <span>NUEVA ORDEN</span>
+                </button>
+                <button class="pos-nav-btn" onclick="irAlHistorial()">
+                    <span class="icon">📜</span>
+                    <span>HISTORIAL</span>
+                </button>
+            </nav>
+            
+            <div class="pos-user-info">
+                <p><strong id="userName">Mesero</strong></p>
+                <button class="pos-logout-btn" onclick="logout()">SALIR</button>
+            </div>
+        </aside>
+        
+        <!-- Contenido Principal -->
+        <div class="pos-main">
+            <!-- Header con Título -->
+            <header class="pos-header">
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <h1 class="menu-title">MENÚ</h1>
+                    <div style="background: rgba(0, 255, 255, 0.1); padding: 8px 16px; border-radius: 8px; border: 1px solid var(--cyan); display: flex; align-items: center; gap: 12px;">
+                        <span style="color: var(--cyan); font-weight: bold;">🪑 Mesa: <span id="mesaDisplay">-</span></span>
+                        <button onclick="cambiarMesa()" style="background: var(--cyan); color: var(--bg-dark); border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">CAMBIAR</button>
+                    </div>
+                </div>
+            </header>
+            
+            <!-- Contenedor reorganizado con mejor distribución -->
+            <div class="pos-wrapper">
+                <!-- Sección de productos y categorías -->
+                <div class="pos-products-section">
+                    <!-- Contenedor de Categorías -->
+                    <div class="pos-categories-wrapper">
+                        <div class="pos-categories" id="categoriesContainer">
+                            <button class="category-btn active" onclick="filtrarCategoria(this, 'TODAS')">Todas</button>
+                            <button class="category-btn" onclick="filtrarCategoria(this, 'BEBIDAS ICE')">Bebidas Ice</button>
+                            <button class="category-btn" onclick="filtrarCategoria(this, 'BEBIDAS VIBE')">Bebidas Vibe</button>
+                            <button class="category-btn" onclick="filtrarCategoria(this, 'GRANIZADOS')">Granizados</button>
+                            <button class="category-btn" onclick="filtrarCategoria(this, 'CERVEZAS')">Cervezas</button>
+                            <button class="category-btn" onclick="filtrarCategoria(this, 'SHOTS')">Shots</button>
+                            <button class="category-btn" onclick="filtrarCategoria(this, 'ADICIONALES')">Adicionales</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Grid de Productos -->
+                    <div class="product-grid" id="productGrid">
+                        <p style="color: var(--text-gray); text-align: center; grid-column: 1/-1; padding: 40px;">Cargando productos...</p>
+                    </div>
+                </div>
+                
+                <!-- Resumen de Orden (Carrito) - Fijo en la derecha -->
+                <aside class="order-summary">
+                    <div class="order-header">
+                        <h2>PEDIDO ACTUAL</h2>
+                    </div>
+                    
+                    <div class="order-items" id="orderItems">
+                        <p class="empty-order">No hay productos en la orden</p>
+                    </div>
+                    
+                    <div class="order-total">
+                        <div class="total-row">
+                            <span>SUBTOTAL:</span>
+                            <span id="subtotalAmount">$0.00</span>
+                        </div>
+                        <div class="total-row">
+                            <span>IMPUESTOS (15%):</span>
+                            <span id="taxAmount">$0.00</span>
+                        </div>
+                        <div class="total-row final">
+                            <span>TOTAL:</span>
+                            <span id="totalAmount">$0.00</span>
+                        </div>
+                    </div>
+                    
+                    <button class="btn-complete-order" id="btnCompleteOrder" onclick="completeOrder()" disabled>COMPLETAR ORDEN</button>
+                    <button class="btn-whatsapp" id="btnWhatsApp" onclick="enviarPorWhatsApp()" style="display:none;">
+                        <span class="whatsapp-icon">💬</span>
+                        ENVIAR POR WHATSAPP
+                    </button>
+                </aside>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para agregar producto -->
+    <div id="modalAgregar" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Agregar Producto</h2>
+                <button class="modal-close" onclick="cerrarModal()">&times;</button>
+            </div>
+            <div class="form-group">
+                <label>Cantidad</label>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <button class="qty-btn" onclick="cambiarCantidadModal(-1)">−</button>
+                    <span class="qty-number" id="cantidadDisplay">1</span>
+                    <button class="qty-btn" onclick="cambiarCantidadModal(1)">+</button>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Especificaciones (selecciona los adicionales deseados)</label>
+                <div class="specifications-list" id="specsList">
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="spec" value="Sin hielo" class="spec-checkbox"> Sin hielo
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="spec" value="Extra hielo" class="spec-checkbox"> Extra hielo
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="spec" value="Con limón" class="spec-checkbox"> Con limón
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="spec" value="Con cereza" class="spec-checkbox"> Con cereza
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="spec" value="Sin azúcar" class="spec-checkbox"> Sin azúcar
+                    </label>
+                    <label class="checkbox-item">
+                        <input type="checkbox" name="spec" value="Doble dosis" class="spec-checkbox"> Doble dosis
+                    </label>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Notas adicionales (opcional)</label>
+                <textarea class="notes-textarea" id="notasProducto" placeholder="Ej: Instrucciones especiales, preferencias, etc."></textarea>
+            </div>
+            <div class="form-actions">
+                <button class="btn-secondary" onclick="cerrarModal()">Cancelar</button>
+                <button class="btn-primary" onclick="confirmarAgregar()">Agregar al Pedido</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para finalizar pedido -->
+    <div id="modalFinalizar" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Finalizar Pedido</h2>
+                <button class="modal-close" onclick="cerrarModalFinalizar()">&times;</button>
+            </div>
+            <div class="form-group">
+                <label>Número de WhatsApp *</label>
+                <input type="tel" id="whatsappNumber" class="form-input" placeholder="+57 300 123 4567" required>
+                <small style="color: var(--text-gray); display: block; margin-top: 8px; font-size: 12px;">
+                    Incluye código de país (ej: +57 para Colombia)
+                </small>
+            </div>
+            <div class="form-group">
+                <label>Nombre del cliente (opcional)</label>
+                <input type="text" id="clientName" class="form-input" placeholder="Nombre del cliente">
+            </div>
+            <div class="form-actions">
+                <button class="btn-secondary" onclick="cerrarModalFinalizar()">Cancelar</button>
+                <button class="btn-primary" onclick="confirmarPedido()">Enviar Pedido</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para historial de mesas activas -->
+    <div id="modalHistorialMesas" class="modal">
+        <div class="modal-content" style="max-width: 1000px; max-height: 90vh; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <h2>Mesas Activas</h2>
+                <button class="modal-close" onclick="cerrarModalHistorialMesas()">&times;</button>
+            </div>
+            
+            <div class="historial-filters" style="margin-bottom: 20px; display: flex; gap: 10px; padding: 0 20px;">
+                <button class="btn-filter active" onclick="filtrarMesas('TODAS')">Todas las Mesas</button>
+                <button class="btn-filter" onclick="filtrarMesas('ACTIVAS')">Solo Activas</button>
+            </div>
+            
+            <div id="mesasContainer" style="flex: 1; overflow-y: auto; padding: 0 20px;">
+                <p style="color: var(--text-gray); text-align: center; padding: 40px;">Cargando mesas activas...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal mejorado para ver y editar detalles de pedido de una mesa -->
+    <div id="modalDetallesPedido" class="modal">
+        <div class="modal-content" style="max-width: 900px; max-height: 90vh; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <h2>Detalles de Pedido - Mesa <span id="mesaDetalleNumero">-</span></h2>
+                <button class="modal-close" onclick="cerrarModalDetallesPedido()">&times;</button>
+            </div>
+            
+            <div style="flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 20px;">
+                <!-- Información de la mesa -->
+                <div class="detalle-seccion">
+                    <h3 style="color: var(--ice-cyan); margin-bottom: 10px;">Información de la Mesa</h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 14px;">
+                        <p><strong>Atendido por:</strong> <span id="detalleAtendidoPor">-</span></p>
+                        <p><strong>Hora:</strong> <span id="detalleHora">-</span></p>
+                        <p><strong>Teléfono:</strong> <span id="detalleTelefono">-</span></p>
+                        <p><strong>Tiempo activa:</strong> <span id="detalleTiempoActiva">-</span></p>
+                    </div>
+                </div>
+
+                <!-- Productos del pedido -->
+                <div class="detalle-seccion">
+                    <h3 style="color: var(--ice-cyan); margin-bottom: 10px;">Productos</h3>
+                    <div id="detalleProductos" style="display: flex; flex-direction: column; gap: 10px;">
+                        <p style="color: var(--text-gray); text-align: center;">Cargando productos...</p>
+                    </div>
+                </div>
+
+                <!-- Resumen de totales -->
+                <div class="detalle-seccion">
+                    <h3 style="color: var(--ice-cyan); margin-bottom: 10px;">Resumen</h3>
+                    <div style="display: flex; flex-direction: column; gap: 8px; border-top: 1px solid rgba(0, 102, 255, 0.3); padding-top: 10px;">
+                        <div style="display: flex; justify-content: space-between; font-weight: 600;">
+                            <span>Subtotal:</span>
+                            <span id="detalleSubtotal">$0.00</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-weight: 600;">
+                            <span>Impuestos (15%):</span>
+                            <span id="detalleImpuestos">$0.00</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 16px; color: var(--ice-cyan); border-top: 1px solid rgba(0, 102, 255, 0.3); padding-top: 10px; margin-top: 10px;">
+                            <span>TOTAL:</span>
+                            <span id="detalleTotal">$0.00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botones de acción -->
+            <div style="display: flex; gap: 10px; padding: 20px; border-top: 2px solid var(--ice-blue); background: rgba(26, 31, 58, 0.5);">
+                <button class="btn-view-details" onclick="agregarProductosAlPedido()" style="flex: 1; background-color: #0066ff;">➕ Agregar Productos</button>
+                <button class="btn-view-details" style="background-color: #f59e0b; flex: 1;" onclick="enviarPedidoWhatsApp()">💬 Enviar por WhatsApp</button>
+                <button class="btn-view-details" style="background-color: #10b981; flex: 1;" onclick="marcarMesaComoPagaConfirm()">✅ Mesa Pagó</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para editar productos del pedido -->
+    <div id="modalEditarProducto" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>Editar Producto</h2>
+                <button class="modal-close" onclick="cerrarModalEditarProducto()">&times;</button>
+            </div>
+            
+            <div class="form-group">
+                <label>Producto</label>
+                <p id="editProductoNombre" style="color: var(--ice-cyan); font-weight: bold; font-size: 16px;">-</p>
+            </div>
+
+            <div class="form-group">
+                <label>Cantidad</label>
+                <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
+                    <button class="qty-btn" onclick="cambiarCantidadEditar(-1)">−</button>
+                    <span class="qty-number" id="editCantidadDisplay">1</span>
+                    <button class="qty-btn" onclick="cambiarCantidadEditar(1)">+</button>
+                </div>
+                <button class="btn-danger" onclick="eliminarProductoDelPedido()" style="width: 100%; background-color: #ff3366; color: white; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">🗑️ Eliminar este producto</button>
+            </div>
+
+            <div class="form-actions">
+                <button class="btn-secondary" onclick="cerrarModalEditarProducto()">Cancelar</button>
+                <button class="btn-primary" onclick="guardarCambiosProducto()">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts en orden correcto -->
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/pos-mesero.js"></script>
+</body>
+</html>

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ice Vibe POS - Login</title>
+    <link rel="stylesheet" href="css/pos-styles.css" />
+  </head>
+  <body>
+    <div class="login-container">
+      <div class="login-card">
+        <div class="login-header">
+          <h1>🧊 Ice Vibe</h1>
+          <p>Sistema de Punto de Venta</p>
+        </div>
+
+        <form id="loginForm" class="login-form">
+          <div class="form-group">
+            <label for="username">Código de Usuario</label>
+            <input type="text" id="username" placeholder="Ej: GER001, VEN001" required />
+          </div>
+
+          <div class="form-group">
+            <label for="password">Contraseña</label>
+            <input type="password" id="password" placeholder="Ingresa tu contraseña" required />
+          </div>
+
+          <div id="errorMessage" class="error-message"></div>
+
+          <button type="submit" class="btn-login">Iniciar Sesión</button>
+          
+          <!-- Added password recovery link -->
+          <div style="text-align: center; margin-top: 15px;">
+            <button type="button" class="btn-recover-password" onclick="mostrarModalRecuperacion()">
+              ¿Olvidaste tu contraseña?
+            </button>
+          </div>
+        </form>
+
+        <div class="login-footer">
+          <p>Usuarios de prueba:</p>
+          <ul>
+            <li><strong>ADMIN:</strong> admin123</li>
+            <li><strong>GER001:</strong> gerente123</li>
+            <li><strong>VEN001:</strong> vendedor123</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Added password recovery modal -->
+    <div id="modalRecuperacion" class="modal">
+      <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header">
+          <h2>Recuperar Contraseña</h2>
+          <button class="modal-close" onclick="cerrarModalRecuperacion()">&times;</button>
+        </div>
+        
+        <div class="form-group">
+          <label>Código de Usuario</label>
+          <input type="text" id="codigoRecuperacion" class="form-input" placeholder="Ej: ADMIN, GER001" required />
+        </div>
+        
+        <div class="form-group">
+          <label>Email Registrado</label>
+          <input type="email" id="emailRecuperacion" class="form-input" placeholder="tu@email.com" required />
+        </div>
+        
+        <div id="recoveryMessage" class="recovery-message"></div>
+        
+        <div class="form-actions">
+          <button type="button" class="btn-secondary" onclick="cerrarModalRecuperacion()">Cancelar</button>
+          <button type="button" class="btn-primary" onclick="enviarRecuperacion()">Enviar Instrucciones</button>
+        </div>
+        
+        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--cyan); text-align: center; font-size: 12px; color: var(--text-gray);">
+          <p>Contacta con el administrador si no tienes acceso a tu email</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cargar config.js primero, luego auth.js, luego otros scripts -->
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+  </body>
+</html>
