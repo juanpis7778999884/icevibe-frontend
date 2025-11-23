@@ -228,9 +228,7 @@ async function eliminarProducto(id) {
   if (!confirm("¿Está seguro de eliminar este producto?")) return
 
   try {
-    const response = await window.apiRequest(`/productos/${id}/fuerza`, {
-      method: "DELETE",
-    })
+    const response = await apiRequest(`/productos/${id}`, { method: 'DELETE' });
 
     if (response?.success) {
       alert(response.message || "Producto eliminado")
@@ -435,9 +433,7 @@ async function eliminarUsuario(id) {
   if (!confirm("¿Está seguro de eliminar este usuario?")) return
 
   try {
-    const response = await window.apiRequest(`/usuarios/${id}/fuerza`, {
-      method: "DELETE",
-    })
+    const response = await apiRequest(`/usuarios/${id}`, { method: 'DELETE' });
 
     if (response?.success) {
       alert(response.message || "Usuario eliminado")
