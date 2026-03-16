@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ice Vibe - Mesas</title>
+  <link rel="stylesheet" href="css/pos-styles.css" />
+  <style>
+    body { overflow: auto; }
+
+    .mesas-header {
+      background: linear-gradient(135deg, #1a1f3a 0%, #1e2442 100%);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(0,191,255,0.2);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .mesas-header h1 { font-size: 1.3rem; color: #00e5ff; }
+    .mesas-header p  { font-size: 0.8rem; color: #a0aec0; margin-top: 2px; }
+    .header-actions  { display: flex; gap: 10px; align-items: center; }
+
+    .btn-back {
+      background: rgba(0,191,255,0.1);
+      border: 1px solid rgba(0,191,255,0.3);
+      color: #00bfff;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all .2s;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .btn-back:hover { background: rgba(0,191,255,0.2); }
+
+    .leyenda {
+      display: flex;
+      gap: 20px;
+      padding: 14px 24px;
+      background: rgba(255,255,255,0.02);
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      flex-wrap: wrap;
+    }
+    .leyenda-item { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: #a0aec0; }
+    .leyenda-dot  { width: 14px; height: 14px; border-radius: 50%; }
+    .dot-libre    { background: #10b981; box-shadow: 0 0 8px rgba(16,185,129,.6); }
+    .dot-ocupada  { background: #ef4444; box-shadow: 0 0 8px rgba(239,68,68,.6); }
+
+    .mesas-container {
+      padding: 24px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 16px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .mesa-card {
+      background: linear-gradient(135deg, #1a1f3a 0%, #1e2442 100%);
+      border-radius: 14px;
+      padding: 18px 12px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .25s;
+      border: 2px solid transparent;
+      user-select: none;
+    }
+    .mesa-card:hover { transform: translateY(-4px); }
+    .mesa-card.libre {
+      border-color: rgba(16,185,129,.4);
+      box-shadow: 0 0 12px rgba(16,185,129,.15);
+    }
+    .mesa-card.libre:hover {
+      border-color: #10b981;
+      box-shadow: 0 0 20px rgba(16,185,129,.35);
+    }
+    .mesa-card.ocupada {
+      border-color: rgba(239,68,68,.5);
+      box-shadow: 0 0 12px rgba(239,68,68,.2);
+    }
+    .mesa-card.ocupada:hover {
+      border-color: #ef4444;
+      box-shadow: 0 0 20px rgba(239,68,68,.4);
+    }
+
+    .mesa-numero { font-size: 1.8rem; font-weight: 700; color: #fff; line-height: 1; }
+    .mesa-label  { font-size: 0.65rem; color: #a0aec0; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+
+    .mesa-estado {
+      margin-top: 10px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      display: inline-block;
+    }
+    .estado-libre   { background: rgba(16,185,129,.15); color: #10b981; }
+    .estado-ocupada { background: rgba(239,68,68,.15);  color: #ef4444; }
+
+    .mesa-total  { margin-top: 6px; font-size: 0.75rem; color: #00e5ff; font-weight: 600; }
+    .mesa-mesero { margin-top: 3px; font-size: 0.68rem; color: #a0aec0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* MODAL */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.75);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-overlay.show { display: flex; }
+
+    .modal-box {
+      background: linear-gradient(135deg, #1a1f3a 0%, #1e2442 100%);
+      border: 1px solid rgba(0,191,255,.25);
+      border-radius: 18px;
+      width: 100%;
+      max-width: 520px;
+      max-height: 85vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,.6);
+    }
+
+    .modal-header {
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      position: sticky;
+      top: 0;
+      background: linear-gradient(135deg, #1a1f3a 0%, #1e2442 100%);
+      z-index: 10;
+    }
+    .modal-header h2 { font-size: 1.15rem; color: #00e5ff; }
+    .modal-header .meta { font-size: 0.78rem; color: #a0aec0; margin-top: 3px; }
+
+    .btn-close { background: none; border: none; color: #a0aec0; font-size: 1.4rem; cursor: pointer; padding: 0 4px; line-height: 1; }
+    .btn-close:hover { color: #fff; }
+
+    .modal-body { padding: 20px 24px; }
+
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+    .info-card { background: rgba(255,255,255,.04); border-radius: 10px; padding: 12px; }
+    .info-card label { font-size: 0.7rem; color: #a0aec0; text-transform: uppercase; letter-spacing: .5px; }
+    .info-card p    { font-size: 0.95rem; color: #fff; font-weight: 600; margin-top: 3px; }
+
+    .productos-lista h3 { font-size: 0.85rem; color: #a0aec0; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
+
+    .producto-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 9px 12px;
+      background: rgba(255,255,255,.03);
+      border-radius: 8px;
+      margin-bottom: 6px;
+      font-size: 0.85rem;
+    }
+    .producto-row .nombre   { color: #fff; flex: 1; }
+    .producto-row .cantidad { color: #00e5ff; margin: 0 12px; min-width: 30px; text-align: center; }
+    .producto-row .precio   { color: #10b981; font-weight: 600; min-width: 80px; text-align: right; }
+
+    .total-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 14px 12px;
+      border-top: 1px solid rgba(255,255,255,.1);
+      margin-top: 8px;
+      font-weight: 700;
+    }
+    .total-row .label { color: #a0aec0; }
+    .total-row .monto { color: #00e5ff; font-size: 1.15rem; }
+
+    .modal-actions { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+
+    .btn-primary {
+      flex: 1; background: linear-gradient(135deg, #0066ff, #0080ff);
+      color: #fff; border: none; padding: 12px 16px; border-radius: 10px;
+      cursor: pointer; font-size: 0.9rem; font-weight: 600; transition: all .2s; min-width: 120px;
+    }
+    .btn-primary:hover { opacity: .85; transform: translateY(-1px); }
+
+    .btn-success {
+      flex: 1; background: linear-gradient(135deg, #059669, #10b981);
+      color: #fff; border: none; padding: 12px 16px; border-radius: 10px;
+      cursor: pointer; font-size: 0.9rem; font-weight: 600; transition: all .2s; min-width: 120px;
+    }
+    .btn-success:hover { opacity: .85; }
+
+    .stat-bar { display: flex; gap: 20px; padding: 12px 24px; background: rgba(0,0,0,.2); font-size: 0.82rem; flex-wrap: wrap; }
+    .stat-bar span   { color: #a0aec0; }
+    .stat-bar strong { color: #00e5ff; }
+
+    .refresh-btn {
+      background: rgba(0,191,255,.1); border: 1px solid rgba(0,191,255,.3);
+      color: #00bfff; padding: 8px 14px; border-radius: 8px; cursor: pointer;
+      font-size: 0.82rem; transition: all .2s;
+    }
+    .refresh-btn:hover { background: rgba(0,191,255,.2); }
+
+    .empty-state { text-align: center; padding: 20px; color: #a0aec0; font-size: 0.85rem; }
+    .loading     { text-align: center; padding: 60px; color: #a0aec0; }
+  </style>
+</head>
+<body>
+
+  <div class="mesas-header">
+    <div>
+      <h1>🪑 Mapa de Mesas — Ice Vibe</h1>
+      <p id="subtitulo">Cargando...</p>
+    </div>
+    <div class="header-actions">
+      <button class="refresh-btn" onclick="cargarMesas()">🔄 Actualizar</button>
+      <a id="btnVolver" href="#" class="btn-back">← Volver</a>
+    </div>
+  </div>
+
+  <div class="stat-bar">
+    <span>Mesas libres: <strong id="statLibres">-</strong></span>
+    <span>Mesas ocupadas: <strong id="statOcupadas">-</strong></span>
+    <span>Total consumiendo: <strong id="statTotal">-</strong></span>
+  </div>
+
+  <div class="leyenda">
+    <div class="leyenda-item"><div class="leyenda-dot dot-libre"></div> Libre</div>
+    <div class="leyenda-item"><div class="leyenda-dot dot-ocupada"></div> Ocupada</div>
+  </div>
+
+  <div class="mesas-container" id="mesasContainer">
+    <div class="loading">Cargando mesas...</div>
+  </div>
+
+  <div class="modal-overlay" id="modalMesa">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div>
+          <h2 id="modalTitulo">Mesa 1</h2>
+          <div class="meta" id="modalMeta"></div>
+        </div>
+        <button class="btn-close" onclick="cerrarModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="info-grid" id="infoGrid"></div>
+        <div class="productos-lista" id="productosList"></div>
+        <div class="modal-actions" id="modalActions"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script>
+    const session = JSON.parse(localStorage.getItem('session') || 'null');
+    if (!session) window.location.href = 'index.html';
+
+    const esAdmin   = session?.rol === 'ADMIN';
+    const esMesero  = session?.rol === 'VENDEDOR';
+
+    document.getElementById('btnVolver').href = esAdmin ? 'dashboard-admin.html' : 'pos-mesero.html';
+
+    let mesaActual = null;
+
+    function fmt(val) {
+      return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val || 0);
+    }
+
+    function fmtHora(isoStr) {
+      if (!isoStr) return 'N/A';
+      return new Date(isoStr).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    async function cargarMesas() {
+      try {
+        const mesas = await window.apiRequest('/mesas');
+        if (!Array.isArray(mesas) || mesas.length === 0) {
+          await window.apiRequest('/mesas/inicializar', { method: 'POST' });
+          return cargarMesas();
+        }
+        renderMesas(mesas);
+      } catch (e) {
+        document.getElementById('mesasContainer').innerHTML =
+          '<div class="loading">❌ Error cargando mesas. Verifica el backend.</div>';
+      }
+    }
+
+    function renderMesas(mesas) {
+      const libres   = mesas.filter(m => m.estado === 'LIBRE').length;
+      const ocupadas = mesas.filter(m => m.estado === 'OCUPADA').length;
+      const totalConsumiendo = mesas
+        .filter(m => m.estado === 'OCUPADA')
+        .reduce((s, m) => s + parseFloat(m.totalConsumido || 0), 0);
+
+      document.getElementById('statLibres').textContent   = libres;
+      document.getElementById('statOcupadas').textContent = ocupadas;
+      document.getElementById('statTotal').textContent    = fmt(totalConsumiendo);
+      document.getElementById('subtitulo').textContent    = `${ocupadas} mesas ocupadas · ${libres} libres`;
+
+      document.getElementById('mesasContainer').innerHTML = mesas.map(m => `
+        <div class="mesa-card ${m.estado.toLowerCase()}" onclick="abrirMesa(${m.numero})">
+          <div class="mesa-numero">${m.numero}</div>
+          <div class="mesa-label">Mesa</div>
+          <div class="mesa-estado estado-${m.estado.toLowerCase()}">${m.estado}</div>
+          ${m.estado === 'OCUPADA' ? `
+            <div class="mesa-total">${fmt(m.totalConsumido)}</div>
+            <div class="mesa-mesero">👤 ${m.meseroNombre || '-'}</div>
+          ` : ''}
+        </div>
+      `).join('');
+    }
+
+    async function abrirMesa(numero) {
+      try {
+        const data = await window.apiRequest(`/mesas/${numero}`);
+        if (!data.success) { alert('Error al cargar la mesa'); return; }
+
+        mesaActual = data.mesa;
+        const mesa = data.mesa;
+        const productos = data.productos || [];
+
+        document.getElementById('modalTitulo').textContent = `Mesa ${mesa.numero}`;
+        document.getElementById('modalMeta').innerHTML = mesa.estado === 'OCUPADA'
+          ? '<span style="color:#ef4444">● OCUPADA</span>'
+          : '<span style="color:#10b981">● LIBRE</span>';
+
+        document.getElementById('infoGrid').innerHTML = `
+          <div class="info-card"><label>Mesero</label><p>${mesa.meseroNombre || '—'}</p></div>
+          <div class="info-card"><label>Hora apertura</label><p>${fmtHora(mesa.horaApertura)}</p></div>
+          <div class="info-card"><label>Estado</label><p>${mesa.estado}</p></div>
+          <div class="info-card"><label>N° Venta</label><p style="font-size:.8rem">${mesa.numeroVenta || '—'}</p></div>
+        `;
+
+        let productoHtml = '';
+        if (mesa.estado === 'OCUPADA') {
+          productoHtml = '<h3>Consumo actual</h3>';
+          if (productos.length === 0) {
+            productoHtml += '<div class="empty-state">Sin productos aún</div>';
+          } else {
+            productoHtml += productos.map(p => `
+              <div class="producto-row">
+                <span class="nombre">${p.productoNombre}</span>
+                <span class="cantidad">×${p.cantidad}</span>
+                <span class="precio">${fmt(p.subtotal)}</span>
+              </div>
+            `).join('');
+            productoHtml += `
+              <div class="total-row">
+                <span class="label">Total consumido</span>
+                <span class="monto">${fmt(data.totalConsumido)}</span>
+              </div>
+            `;
+          }
+        } else {
+          productoHtml = '<div class="empty-state" style="color:#10b981">✓ Mesa disponible</div>';
+        }
+        document.getElementById('productosList').innerHTML = productoHtml;
+
+        let acciones = '';
+        if (mesa.estado === 'OCUPADA') {
+          if (esAdmin) {
+            acciones += `<button class="btn-success" onclick="cobrarMesa(${mesa.numero})">💳 Cobrar y liberar</button>`;
+          }
+          if (esMesero || esAdmin) {
+            acciones += `<button class="btn-primary" onclick="irAPOS(${mesa.numero})">➕ Agregar productos</button>`;
+          }
+        }
+        acciones += `<button class="btn-back" onclick="cerrarModal()" style="flex:1;text-align:center;padding:12px">Cerrar</button>`;
+        document.getElementById('modalActions').innerHTML = acciones;
+
+        document.getElementById('modalMesa').classList.add('show');
+      } catch(e) {
+        alert('Error al cargar detalle de mesa');
+      }
+    }
+
+    function cerrarModal() {
+      document.getElementById('modalMesa').classList.remove('show');
+      mesaActual = null;
+    }
+
+    async function cobrarMesa(numero) {
+      if (!confirm(`¿Confirmar pago y liberar la Mesa ${numero}?`)) return;
+      try {
+        const res = await window.apiRequest(`/mesas/${numero}/liberar`, { method: 'POST' });
+        if (res.success) {
+          cerrarModal();
+          cargarMesas();
+          alert(`✅ Mesa ${numero} liberada. ¡Pago registrado!`);
+        } else {
+          alert('Error: ' + res.message);
+        }
+      } catch(e) {
+        alert('Error al liberar mesa');
+      }
+    }
+
+    function irAPOS(numero) {
+      sessionStorage.setItem('mesaPreseleccionada', numero);
+      window.location.href = 'pos-mesero.html';
+    }
+
+    cargarMesas();
+    setInterval(cargarMesas, 30000);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarModal(); });
+  </script>
+</body>
+</html>
