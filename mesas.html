@@ -546,9 +546,7 @@
       const btnWA  = document.getElementById('btnPosWhatsapp')
 
       if (carrito.length === 0) {
-        container.innerHTML = '<div style="text-align:center;padding:30px;color:#a0aec0;font-size:0.85rem;">Selecciona productos</div>'
-        btnReg.disabled = true; btnReg.style.opacity = '.4'
-        btnWA.disabled  = true; btnWA.style.opacity  = '.4'
+        container.innerHTML = '<div style="text-align:center;padding:30px;color:#a0aec0;font-size:0.85rem;">Selecciona productos para agregar</div>'
       } else {
         container.innerHTML = carrito.map((item, i) => `
           <div class="carrito-item-pos">
@@ -563,50 +561,16 @@
             </div>
           </div>
         `).join('')
-        btnReg.disabled = false; btnReg.style.opacity = '1'
-        btnWA.disabled  = false; btnWA.style.opacity  = '1'
       }
+
+      // Activo si hay carrito nuevo O si la mesa está ocupada
+      const hayAlgo = carrito.length > 0 || (mesaActual && mesaActual.estado === 'OCUPADA')
+      btnReg.disabled = !hayAlgo; btnReg.style.opacity = hayAlgo ? '1' : '.4'
+      btnWA.disabled  = !hayAlgo; btnWA.style.opacity  = hayAlgo ? '1' : '.4'
 
       const subtotalNuevo = carrito.reduce((s, i) => s + i.producto.precio * i.cantidad, 0)
       document.getElementById('posSubtotal').textContent = fmt(subtotalNuevo)
       document.getElementById('posTotal').textContent    = fmt(totalPrevio + subtotalNuevo)
-    }
-
-    // ===== REGISTRAR VENTA =====
-async function posRegistrarVenta() {
-      if (carrito.length === 0 && mesaActual.estado === 'OCUPADA') {
-        await cobrarMesa(mesaActual.numero)
-        return
-      }
-      if (carrito.length === 0) { alert('El carrito está vacío'); return }
-      try {
-        const subtotal = carrito.reduce((s, i) => s + i.producto.precio * i.cantidad, 0)
-        const detalles = carrito.map(i => ({
-          productoId: i.producto.id, cantidad: i.cantidad,
-          precioUnitario: i.producto.precio, subtotal: i.producto.precio * i.cantidad, notas: ''
-        }))
-
-        if (mesaActual.estado === 'OCUPADA' && mesaActual.ventaActivaId) {
-          const res = await window.apiRequest(`/mesas/${mesaActual.numero}/agregar-productos`, {
-            method: 'POST', body: JSON.stringify({ detalles })
-          })
-          if (!res.success) throw new Error(res.message)
-          alert(`✅ Productos agregados a Mesa ${mesaActual.numero}`)
-        } else {
-          const res = await window.apiRequest('/ventas', {
-            method: 'POST',
-            body: JSON.stringify({
-              usuarioId: session.id, subtotal, impuestos: 0, descuento: 0, total: subtotal,
-              numeroMesa: mesaActual.numero, meseroNombre: session.nombre,
-              observaciones: `Mesa: ${mesaActual.numero} | ${session.nombre}`, detalles
-            })
-          })
-          if (!res.success) throw new Error(res.message)
-          alert(`✅ Venta registrada en Mesa ${mesaActual.numero}`)
-        }
-        cerrarModal()
-        cargarMesas()
-      } catch(e) { alert('Error: ' + e.message) }
     }
 
     // ===== WHATSAPP =====
