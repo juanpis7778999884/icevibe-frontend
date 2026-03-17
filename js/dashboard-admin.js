@@ -62,8 +62,17 @@ async function cargarEstadisticas() {
     const productos = Array.isArray(productosRes) ? productosRes : productosRes.data || []
     const ventas = Array.isArray(ventasRes) ? ventasRes : ventasRes.data || []
 
-    const hoy = new Date().toISOString().split("T")[0]
-    const ventasHoy = ventas.filter((v) => v.fechaVenta && v.fechaVenta.startsWith(hoy))
+    const hoy = new Date()
+    const ventasHoy = ventas.filter((v) => {
+      if (!v.fechaVenta) return false
+      const fechaVenta = new Date(v.fechaVenta)
+      return (
+        fechaVenta.getDate() === hoy.getDate() &&
+        fechaVenta.getMonth() === hoy.getMonth() &&
+        fechaVenta.getFullYear() === hoy.getFullYear()
+      )
+    })
+
     const totalHoy = ventasHoy.reduce((sum, v) => sum + Number.parseFloat(v.total || 0), 0)
     const stockBajo = productos.filter((p) => p.stock <= (p.stockMinimo || 5)).length
 
