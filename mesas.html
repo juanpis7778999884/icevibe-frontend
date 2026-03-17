@@ -440,7 +440,7 @@
         consumoPrevio = data.productos || []
         totalPrevio   = parseFloat(data.totalConsumido || 0)
 
-        document.getElementById('modalTitulo').textContent  = `Mesa ${numero}`
+        document.getElementById('modalTitulo').textContent    = `Mesa ${numero}`
         document.getElementById('carritoNumMesa').textContent = numero
 
         const estado = mesaActual.estado === 'OCUPADA'
@@ -448,7 +448,6 @@
           : `<span style="color:#10b981">● LIBRE</span> · Listo para tomar pedido`
         document.getElementById('modalMeta').innerHTML = estado
 
-        // Consumo previo
         if (mesaActual.estado === 'OCUPADA' && consumoPrevio.length > 0) {
           document.getElementById('consumoPrevioBox').style.display = 'block'
           document.getElementById('consumoPrevioItems').innerHTML = consumoPrevio.map(p => `
@@ -542,8 +541,6 @@
 
     function actualizarCarrito() {
       const container = document.getElementById('carritoItems')
-      const btnReg = document.getElementById('btnRegistrar')
-      const btnWA  = document.getElementById('btnPosWhatsapp')
 
       if (carrito.length === 0) {
         container.innerHTML = '<div style="text-align:center;padding:30px;color:#a0aec0;font-size:0.85rem;">Selecciona productos para agregar</div>'
@@ -563,47 +560,112 @@
         `).join('')
       }
 
-      // Activo si hay carrito nuevo O si la mesa está ocupada
-      const hayAlgo = carrito.length > 0 || (mesaActual && mesaActual.estado === 'OCUPADA')
-      btnReg.disabled = !hayAlgo; btnReg.style.opacity = hayAlgo ? '1' : '.4'
-      btnWA.disabled  = !hayAlgo; btnWA.style.opacity  = hayAlgo ? '1' : '.4'
-
       const subtotalNuevo = carrito.reduce((s, i) => s + i.producto.precio * i.cantidad, 0)
       document.getElementById('posSubtotal').textContent = fmt(subtotalNuevo)
       document.getElementById('posTotal').textContent    = fmt(totalPrevio + subtotalNuevo)
     }
 
+    // ===== REGISTRAR VENTA =====
+    async function posRegistrarVenta() {
+      try {
+        // Si carrito vacío y mesa ocupada → solo cobrar y liberar
+        if (carrito.length === 0 && mesaActual.estado === 'OCUPADA') {
+          await cobrarMesa(mesaActual.numero)
+          return
+        }
+
+        // Si carrito vacío y mesa libre → no hacer nada
+        if (carrito.length === 0) {
+          alert('Selecciona al menos un producto')
+          return
+        }
+
+        const subtotal = carrito.reduce((s, i) => s + i.producto.precio * i.cantidad, 0)
+        const detalles = carrito.map(i => ({
+          productoId: i.producto.id,
+          cantidad: i.cantidad,
+          precioUnitario: i.producto.precio,
+          subtotal: i.producto.precio * i.cantidad,
+          notas: ''
+        }))
+
+        if (mesaActual.estado === 'OCUPADA' && mesaActual.ventaActivaId) {
+          // Mesa ocupada → agregar productos a la venta existente
+          const res = await window.apiRequest(`/mesas/${mesaActual.numero}/agregar-productos`, {
+            method: 'POST',
+            body: JSON.stringify({ detalles })
+          })
+          if (!res.success) throw new Error(res.message)
+          alert(`✅ Productos agregados a Mesa ${mesaActual.numero}`)
+        } else {
+          // Mesa libre → crear nueva venta y ocupar mesa
+          const res = await window.apiRequest('/ventas', {
+            method: 'POST',
+            body: JSON.stringify({
+              usuarioId: session.id,
+              subtotal: subtotal,
+              impuestos: 0,
+              descuento: 0,
+              total: subtotal,
+              numeroMesa: mesaActual.numero,
+              meseroNombre: session.nombre,
+              observaciones: `Mesa: ${mesaActual.numero} | ${session.nombre}`,
+              detalles: detalles
+            })
+          })
+          if (!res.success) throw new Error(res.message)
+          alert(`✅ Venta registrada en Mesa ${mesaActual.numero}`)
+        }
+
+        cerrarModal()
+        cargarMesas()
+
+      } catch(e) {
+        alert('Error: ' + e.message)
+      }
+    }
+
     // ===== WHATSAPP =====
     async function posEnviarWhatsApp() {
-      if (carrito.length === 0) { alert('El carrito está vacío'); return }
+      if (carrito.length === 0) { alert('Agrega productos al carrito primero'); return }
+
       const subtotalNuevo = carrito.reduce((s, i) => s + i.producto.precio * i.cantidad, 0)
       const totalMesa = totalPrevio + subtotalNuevo
 
       let msg = `🧊 *PEDIDO ICE VIBE* 🧊\n\n🪑 Mesa: ${mesaActual.numero}\n👨‍💼 ${session.nombre}\n\n`
+
       if (consumoPrevio.length > 0) {
         msg += `*YA CONSUMIDO:*\n`
         consumoPrevio.forEach(p => { msg += `• ${p.productoNombre} ×${p.cantidad} = ${fmt(p.subtotal)}\n` })
         msg += `\n`
       }
-      msg += `*NUEVOS:*\n`
+
+      msg += `*NUEVOS PRODUCTOS:*\n`
       carrito.forEach(i => { msg += `• ${i.producto.nombre} ×${i.cantidad} = ${fmt(i.producto.precio * i.cantidad)}\n` })
-      msg += `\n━━━━━━━━━━━━━━━━\n💰 *TOTAL: ${fmt(totalMesa)}*\n\n¡Gracias! 🎉`
+      msg += `\n━━━━━━━━━━━━━━━━\n💰 *TOTAL MESA: ${fmt(totalMesa)}*\n\n¡Gracias! 🎉`
 
       const tel = window.API_CONFIG.WHATSAPP_NUMBER.replace(/\D/g, '')
       window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, '_blank')
+
+      // Guardar en BD automáticamente
       await posRegistrarVenta()
     }
 
-    // ===== COBRAR MESA (desde botón de cobrar si mesa ocupada) =====
+    // ===== COBRAR Y LIBERAR MESA =====
     async function cobrarMesa(numero) {
       if (!confirm(`¿Confirmar pago y liberar la Mesa ${numero}?`)) return
       try {
         const res = await window.apiRequest(`/mesas/${numero}/liberar`, { method: 'POST' })
         if (res.success) {
-          cerrarModal(); cargarMesas()
+          cerrarModal()
+          cargarMesas()
           alert(`✅ Mesa ${numero} liberada. ¡Pago registrado!`)
-        } else { alert('Error: ' + res.message) }
-      } catch(e) { alert('Error al liberar mesa') }
+        } else {
+          alert('Error: ' + res.message)
+        }
+      } catch(e) {
+        alert('Error al liberar mesa: ' + e.message)
+      }
     }
 
     function irAPOS(numero) {
