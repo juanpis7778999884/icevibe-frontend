@@ -1,12 +1,19 @@
-// Get session from localStorage (set by auth.js)
 function getSession() {
- const sessionData = sessionStorage.getItem("session")
-  if (!sessionData) {
-    console.error("[v0] No session found")
-    window.location.href = "index.html"
-    return null
+  const tabData = sessionStorage.getItem("tabSession")
+  if (tabData) {
+    const s = JSON.parse(tabData)
+    if (s.rol === "ADMIN") return s
   }
-  return JSON.parse(sessionData)
+  
+  // Buscar en localStorage todas las sesiones guardadas por rol
+  const adminData = localStorage.getItem("session_ADMIN")
+  if (adminData) {
+    sessionStorage.setItem("tabSession", adminData)
+    return JSON.parse(adminData)
+  }
+
+  window.location.href = "index.html"
+  return null
 }
 
 const session = getSession()
@@ -735,7 +742,7 @@ async function eliminarTodasLasVentas() {
 
 function cerrarSesion() {
   if (confirm("¿Está seguro de cerrar sesión?")) {
-    sessionStorage.removeItem("session")
+    sessionStorage.removeItem("tabSession")
     window.location.href = "index.html"
   }
 }

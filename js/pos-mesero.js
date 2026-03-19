@@ -1,689 +1,750 @@
-// Get session from localStorage (set by auth.js)
 function getSession() {
- const sessionData = sessionStorage.getItem("session")
-  if (!sessionData) {
-    console.error("[v0] No session found")
-    window.location.href = "index.html"
-    return null
+  const tabData = sessionStorage.getItem("tabSession")
+  if (tabData) {
+    const s = JSON.parse(tabData)
+    if (s.rol === "VENDEDOR" || s.rol === "ADMIN") return s
   }
-  return JSON.parse(sessionData)
+
+  const vendedorData = localStorage.getItem("session_VENDEDOR")
+  if (vendedorData) {
+    sessionStorage.setItem("tabSession", vendedorData)
+    return JSON.parse(vendedorData)
+  }
+
+  const adminData = localStorage.getItem("session_ADMIN")
+  if (adminData) {
+    sessionStorage.setItem("tabSession", adminData)
+    return JSON.parse(adminData)
+  }
+
+  window.location.href = "index.html"
+  return null
 }
 
 const session = getSession()
 
-if (!session || session.rol !== "ADMIN") {
-  alert("Acceso denegado. Solo administradores pueden acceder.")
+if (!session || (session.rol !== "VENDEDOR" && session.rol !== "ADMIN")) {
   window.location.href = "index.html"
 }
 
-// Verificar que API está disponible
-if (!window.apiRequest) {
-  console.error("[v0] apiRequest no está disponible. Verifica que config.js está cargado.")
+if (!window.API_CONFIG) {
+  console.error("[v0] API_CONFIG no definido. Verifica que config.js esté cargado")
+  alert("Error de configuración. Por favor recarga la página.")
+  window.location.href = "index.html"
 }
+
+document.getElementById("userName").textContent = session.nombre
 
 let productos = []
-let usuarios = []
-let ventas = []
+let carrito = []
+let productoSeleccionado = null
+let categoriaActual = "TODAS"
+let refreshInterval = null
+let mesaNumero = null
+let historialVentas = []
+let ventaDetalleActual = null
+let productoEditandoIndex = null
+let detallesVentaEditando = null
 
-// Cargar datos al iniciar
 document.addEventListener("DOMContentLoaded", () => {
-  const nombreAdmin = document.getElementById("adminName")
-  if (nombreAdmin) {
-    nombreAdmin.textContent = session.nombre
-  }
-
-  cargarEstadisticas()
+  pedirNumeroDeMesa()
   cargarProductos()
-  cargarUsuarios()
-  cargarVentas()
 
-  // Event listeners para búsqueda
-  document.getElementById("searchProductos")?.addEventListener("input", filtrarProductos)
-  document.getElementById("searchUsuarios")?.addEventListener("input", filtrarUsuarios)
-  document.getElementById("searchVentas")?.addEventListener("input", filtrarVentas)
+  refreshInterval = setInterval(() => {
+    console.log("[v0] Auto-refreshing products for price updates...")
+    cargarProductos()
+  }, 30000)
 
-  // Event listeners para reportes
-  document.getElementById("generarReporteDiario")?.addEventListener("click", generarReporteDiario)
-  document.getElementById("generarReporteSemanal")?.addEventListener("click", generarReporteSemanal)
-  document.getElementById("generarReporteMensual")?.addEventListener("click", generarReporteMensual)
-
-  // Event listener para eliminar todas las ventas
-  document.getElementById("eliminarTodasLasVentas")?.addEventListener("click", eliminarTodasLasVentas)
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      console.log("[v0] Tab is visible, refreshing products...")
+      cargarProductos()
+    }
+  })
 })
 
-// ==================== ESTADÍSTICAS ====================
+// ==================== MESAS ====================
 
-async function cargarEstadisticas() {
-  try {
-    console.log("[v0] Cargando estadísticas...")
-
-    const [productosRes, ventasRes] = await Promise.all([window.apiRequest("/productos"), window.apiRequest("/ventas")])
-
-    const productos = Array.isArray(productosRes) ? productosRes : productosRes.data || []
-    const ventas = Array.isArray(ventasRes) ? ventasRes : ventasRes.data || []
-
-    const hoy = new Date()
-    const ventasHoy = ventas.filter((v) => {
-      if (!v.fechaVenta) return false
-      const fechaVenta = new Date(v.fechaVenta)
-      return (
-        fechaVenta.getDate() === hoy.getDate() &&
-        fechaVenta.getMonth() === hoy.getMonth() &&
-        fechaVenta.getFullYear() === hoy.getFullYear()
-      )
-    })
-
-    const totalHoy = ventasHoy.reduce((sum, v) => sum + Number.parseFloat(v.total || 0), 0)
-    const stockBajo = productos.filter((p) => p.stock <= (p.stockMinimo || 5)).length
-
-    document.getElementById("ventasHoy").textContent = ventasHoy.length
-    document.getElementById("ingresosHoy").textContent = formatearMoneda(totalHoy)
-    document.getElementById("totalProductos").textContent = productos.filter((p) => p.activo).length
-    document.getElementById("stockBajo").textContent = stockBajo
-  } catch (error) {
-    console.error("[v0] Error al cargar estadísticas:", error)
+function pedirNumeroDeMesa() {
+  const preseleccionada = sessionStorage.getItem("mesaPreseleccionada")
+  if (preseleccionada) {
+    sessionStorage.removeItem("mesaPreseleccionada")
+    mesaNumero = preseleccionada
+    document.getElementById("mesaDisplay").textContent = mesaNumero
+    console.log("[v0] Mesa preseleccionada:", mesaNumero)
+    return
   }
+  const mesa = prompt("¿Cuál es el número de mesa? (1-30)", "1")
+  if (mesa === null || mesa.trim() === "") {
+    pedirNumeroDeMesa()
+    return
+  }
+  const num = parseInt(mesa.trim())
+  if (isNaN(num) || num < 1 || num > 30) {
+    alert("Por favor ingresa un número de mesa válido (1-30)")
+    pedirNumeroDeMesa()
+    return
+  }
+  mesaNumero = mesa.trim()
+  document.getElementById("mesaDisplay").textContent = mesaNumero
+  console.log("[v0] Mesa asignada:", mesaNumero)
 }
 
-// ==================== TABS ====================
-
-function cambiarTab(tab) {
-  document.querySelectorAll(".tab-btn").forEach((btn) => btn.classList.remove("active"))
-  document.querySelectorAll(".tab-content").forEach((content) => content.classList.remove("active"))
-
-  event.target.classList.add("active")
-  document.getElementById(`tab-${tab}`)?.classList.add("active")
+function cambiarMesa() {
+  const nuevaMesa = prompt("Ingresa el nuevo número de mesa:", mesaNumero)
+  if (nuevaMesa !== null && nuevaMesa.trim() !== "") {
+    mesaNumero = nuevaMesa.trim()
+    document.getElementById("mesaDisplay").textContent = mesaNumero
+    console.log("[v0] Mesa cambiada a:", mesaNumero)
+  }
 }
 
 // ==================== PRODUCTOS ====================
 
 async function cargarProductos() {
   try {
-    console.log("[v0] Cargando productos...")
-    const response = await window.apiRequest("/productos")
+    console.log("[v0] Loading products from API...")
+    const response = await window.apiRequest("/productos/activos")
+    console.log("[v0] Products response:", response)
+    if (response && response.success === false) {
+      throw new Error(response.message || "Error al cargar productos")
+    }
     productos = Array.isArray(response) ? response : response.data || []
-    console.log("[v0] Productos cargados:", productos.length)
-    mostrarProductos(productos)
+    console.log("[v0] Products loaded:", productos.length)
+    mostrarProductos()
   } catch (error) {
     console.error("[v0] Error al cargar productos:", error)
-    document.getElementById("tablaProductos").innerHTML =
-      '<tr><td colspan="7" style="text-align: center; color: #ff3366;">Error al cargar productos</td></tr>'
+    const grid = document.getElementById("productGrid")
+    if (grid) {
+      grid.innerHTML =
+        '<p style="color: #ff3366; text-align: center; grid-column: 1/-1; padding: 40px;">Error al cargar productos. Verifica que el backend esté corriendo.</p>'
+    }
   }
 }
 
-function mostrarProductos(lista) {
-  const tbody = document.getElementById("tablaProductos")
+function mostrarProductos() {
+  const grid = document.getElementById("productGrid")
+  if (!grid) return
 
-  if (lista.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No hay productos</td></tr>'
+  let productosFiltrados = productos
+  if (categoriaActual !== "TODAS") {
+    productosFiltrados = productos.filter((p) => {
+      const categoria = (p.categoria || "").toUpperCase()
+      return categoria === categoriaActual.toUpperCase()
+    })
+  }
+
+  if (productosFiltrados.length === 0) {
+    grid.innerHTML =
+      '<p style="color: var(--text-gray); text-align: center; grid-column: 1/-1;">No hay productos en esta categoría</p>'
     return
   }
 
-  tbody.innerHTML = lista
+  grid.innerHTML = productosFiltrados
     .map(
       (p) => `
-        <tr>
-            <td>${p.codigo}</td>
-            <td>${p.nombre}</td>
-            <td>${p.categoria}</td>
-            <td>${formatearMoneda(p.precio)}</td>
-            <td>
-                <span class="badge ${p.stock <= (p.stockMinimo || 5) ? "badge-danger" : "badge-success"}">
-                    ${p.stock}
-                </span>
-            </td>
-            <td>
-                <span class="badge ${p.activo ? "badge-success" : "badge-danger"}">
-                    ${p.activo ? "Activo" : "Inactivo"}
-                </span>
-            </td>
-            <td>
-                <button class="btn-icon" onclick="editarProducto(${p.id})" title="Editar">✏️</button>
-                <button class="btn-icon" onclick="eliminarProducto(${p.id})" title="Eliminar">🗑️</button>
-            </td>
-        </tr>
+        <div class="product-card" onclick="abrirModalAgregar(${p.id})">
+            <div class="product-icon">
+              ${p.nombre.includes("Cerveza") ? "🍺" : p.nombre.includes("Shot") ? "🥃" : p.nombre.includes("Granizado") ? "🧊" : "🥤"}
+            </div>
+            <h3 class="product-name">${p.nombre}</h3>
+            ${p.descripcion ? `<p class="product-description">${p.descripcion}</p>` : ""}
+            <p class="product-price">${formatearMoneda(p.precio)}</p>
+            <p style="color: #00ff88; font-size: 0.9em; margin-top: 8px;">Stock: ${p.stock || 0}</p>
+        </div>
     `,
     )
     .join("")
 }
 
-function filtrarProductos() {
-  const busqueda = document.getElementById("searchProductos").value.toLowerCase()
-  const filtrados = productos.filter(
-    (p) =>
-      p.nombre.toLowerCase().includes(busqueda) ||
-      p.codigo.toLowerCase().includes(busqueda) ||
-      p.categoria.toLowerCase().includes(busqueda),
+function filtrarCategoria(element, categoria) {
+  categoriaActual = categoria
+  document.querySelectorAll(".category-btn").forEach((btn) => btn.classList.remove("active"))
+  element.classList.add("active")
+  mostrarProductos()
+}
+
+// ==================== MODAL AGREGAR PRODUCTO ====================
+
+function abrirModalAgregar(productoId) {
+  productoSeleccionado = productos.find((p) => p.id === productoId)
+  if (!productoSeleccionado) return
+
+  const modal = document.getElementById("modalAgregar")
+  if (!modal) return
+
+  const titulo = modal.querySelector("h2")
+  const cantidadDisplay = modal.querySelector("#cantidadDisplay")
+  const notasInput = modal.querySelector("#notasProducto")
+  const specs = modal.querySelectorAll(".spec-checkbox")
+  specs.forEach((spec) => (spec.checked = false))
+
+  if (titulo) titulo.textContent = `Agregar ${productoSeleccionado.nombre}`
+  if (cantidadDisplay) cantidadDisplay.textContent = "1"
+  if (notasInput) notasInput.value = ""
+
+  modal.classList.add("show")
+}
+
+function cerrarModal() {
+  const modal = document.getElementById("modalAgregar")
+  if (modal) modal.classList.remove("show")
+  productoSeleccionado = null
+}
+
+function cambiarCantidadModal(delta) {
+  const modal = document.getElementById("modalAgregar")
+  if (!modal) return
+  const cantidadDisplay = modal.querySelector("#cantidadDisplay")
+  if (!cantidadDisplay) return
+  let cantidad = Number.parseInt(cantidadDisplay.textContent) || 1
+  cantidad = Math.max(1, Math.min(productoSeleccionado.stock || 999, cantidad + delta))
+  cantidadDisplay.textContent = cantidad
+}
+
+function confirmarAgregar() {
+  const modal = document.getElementById("modalAgregar")
+  if (!modal || !productoSeleccionado) return
+
+  const cantidadDisplay = modal.querySelector("#cantidadDisplay")
+  const notasInput = modal.querySelector("#notasProducto")
+  const specsChecked = modal.querySelectorAll(".spec-checkbox:checked")
+  const especificaciones = Array.from(specsChecked).map((spec) => spec.value).join(", ")
+
+  const cantidad = Number.parseInt(cantidadDisplay?.textContent || 1)
+  const notas = notasInput?.value.trim() || ""
+  const notasCompletas = [especificaciones, notas].filter(Boolean).join(" | ")
+
+  const itemExistente = carrito.find(
+    (item) => item.producto.id === productoSeleccionado.id && item.notas === notasCompletas,
   )
-  mostrarProductos(filtrados)
-}
 
-function abrirModalProducto(id = null) {
-  document.getElementById("modalProductoTitulo").textContent = id ? "Editar Producto" : "Nuevo Producto"
-  document.getElementById("formProducto").reset()
-  document.getElementById("productoId").value = ""
-  document.getElementById("productoActivo").checked = true
-
-  if (id) {
-    const producto = productos.find((p) => p.id === id)
-    if (producto) {
-      document.getElementById("productoId").value = producto.id
-      document.getElementById("productoCodigo").value = producto.codigo
-      document.getElementById("productoNombre").value = producto.nombre
-      document.getElementById("productoCategoria").value = producto.categoria
-      document.getElementById("productoPrecio").value = producto.precio
-      document.getElementById("productoStock").value = producto.stock
-      document.getElementById("productoStockMinimo").value = producto.stockMinimo || 5
-      document.getElementById("productoDescripcion").value = producto.descripcion || ""
-      document.getElementById("productoActivo").checked = producto.activo
-      document.getElementById("productoCodigo").readOnly = true
-    }
+  if (itemExistente) {
+    itemExistente.cantidad += cantidad
   } else {
-    document.getElementById("productoCodigo").readOnly = false
+    carrito.push({ producto: productoSeleccionado, cantidad, notas: notasCompletas })
   }
 
-  document.getElementById("modalProducto").classList.add("active")
+  actualizarCarrito()
+  cerrarModal()
 }
 
-function cerrarModalProducto() {
-  document.getElementById("modalProducto").classList.remove("active")
-}
+// ==================== CARRITO ====================
 
-async function guardarProducto(event) {
-  event.preventDefault()
+function actualizarCarrito() {
+  const orderItems = document.getElementById("orderItems")
+  const btnCompleteOrder = document.getElementById("btnCompleteOrder")
+  if (!orderItems) return
 
-  const id = document.getElementById("productoId").value
-  const data = {
-    codigo: document.getElementById("productoCodigo").value,
-    nombre: document.getElementById("productoNombre").value,
-    categoria: document.getElementById("productoCategoria").value,
-    precio: Number.parseFloat(document.getElementById("productoPrecio").value),
-    stock: Number.parseInt(document.getElementById("productoStock").value),
-    stockMinimo: Number.parseInt(document.getElementById("productoStockMinimo").value),
-    descripcion: document.getElementById("productoDescripcion").value,
-    activo: document.getElementById("productoActivo").checked,
-  }
-
-  try {
-    const url = id ? `/productos/${id}` : "/productos"
-    const method = id ? "PUT" : "POST"
-
-    const response = await window.apiRequest(url, {
-      method: method,
-      body: JSON.stringify(data),
-    })
-
-    if (response?.success) {
-      alert(response.message || "Producto guardado exitosamente")
-      cerrarModalProducto()
-      cargarProductos()
-      cargarEstadisticas()
-
-      console.log("[v0] Producto actualizado. Los precios en POS se sincronizarán automáticamente.")
-    } else {
-      alert("Error: " + (response?.message || "Error desconocido"))
-    }
-  } catch (error) {
-    console.error("[v0] Error al guardar producto:", error)
-    alert("Error al guardar producto: " + error.message)
-  }
-}
-
-function editarProducto(id) {
-  abrirModalProducto(id)
-}
-
-async function eliminarProducto(id) {
-  if (!confirm("¿Está seguro de eliminar este producto?")) return
-
-  try {
-    const response = await apiRequest(`/productos/${id}`, { method: 'DELETE' });
-
-    if (response?.success) {
-      alert(response.message || "Producto eliminado")
-      await cargarProductos()
-      await cargarEstadisticas()
-    } else {
-      alert("Error: " + (response?.message || "Error desconocido"))
-    }
-  } catch (error) {
-    console.error("[v0] Error al eliminar producto:", error)
-    alert("Error al eliminar producto")
-  }
-}
-
-// ==================== USUARIOS ====================
-
-async function cargarUsuarios() {
-  try {
-    console.log("[v0] Cargando usuarios...")
-    const response = await window.apiRequest("/usuarios")
-    usuarios = Array.isArray(response) ? response : response.data || []
-    console.log("[v0] Usuarios cargados:", usuarios.length)
-    mostrarUsuarios(usuarios)
-  } catch (error) {
-    console.error("[v0] Error al cargar usuarios:", error)
-    document.getElementById("tablaUsuarios").innerHTML =
-      '<tr><td colspan="6" style="text-align: center; color: #ff3366;">Error al cargar usuarios</td></tr>'
-  }
-}
-
-function mostrarUsuarios(lista) {
-  const tbody = document.getElementById("tablaUsuarios")
-
-  if (lista.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No hay usuarios</td></tr>'
-    return
-  }
-
-  tbody.innerHTML = lista
-    .map(
-      (u) => `
-        <tr>
-            <td>${u.codigo}</td>
-            <td>${u.nombre}</td>
-            <td>${u.email}</td>
-            <td><span class="badge badge-success">${u.rol}</span></td>
-            <td>
-                <span class="badge ${u.activo ? "badge-success" : "badge-danger"}">
-                    ${u.activo ? "Activo" : "Inactivo"}
-                </span>
-            </td>
-            <td>
-                <button class="btn-icon" onclick="editarUsuario(${u.id})" title="Editar">✏️</button>
-                <button class="btn-icon" onclick="cambiarContrasena(${u.id})" title="Cambiar Contraseña">🔐</button>
-                <button class="btn-icon" onclick="eliminarUsuario(${u.id})" title="Eliminar">🗑️</button>
-            </td>
-        </tr>
-    `,
-    )
-    .join("")
-}
-
-function filtrarUsuarios() {
-  const busqueda = document.getElementById("searchUsuarios").value.toLowerCase()
-  const filtrados = usuarios.filter(
-    (u) =>
-      u.nombre.toLowerCase().includes(busqueda) ||
-      u.codigo.toLowerCase().includes(busqueda) ||
-      u.email.toLowerCase().includes(busqueda),
-  )
-  mostrarUsuarios(filtrados)
-}
-
-function abrirModalUsuario(id = null) {
-  document.getElementById("modalUsuarioTitulo").textContent = id ? "Editar Usuario" : "Nuevo Usuario"
-  document.getElementById("formUsuario").reset()
-  document.getElementById("usuarioId").value = ""
-  document.getElementById("usuarioActivo").checked = true
-
-  if (id) {
-    const usuario = usuarios.find((u) => u.id === id)
-    if (usuario) {
-      document.getElementById("usuarioId").value = usuario.id
-      document.getElementById("usuarioCodigo").value = usuario.codigo
-      document.getElementById("usuarioNombre").value = usuario.nombre
-      document.getElementById("usuarioEmail").value = usuario.email
-      document.getElementById("usuarioRol").value = usuario.rol
-      document.getElementById("usuarioActivo").checked = usuario.activo
-      document.getElementById("usuarioCodigo").readOnly = true
-      document.getElementById("passwordGroup").style.display = "none"
-    }
+  if (carrito.length === 0) {
+    orderItems.innerHTML = '<p class="empty-order">No hay productos en la orden</p>'
+    if (btnCompleteOrder) btnCompleteOrder.disabled = true
   } else {
-    document.getElementById("usuarioCodigo").readOnly = false
-    document.getElementById("passwordGroup").style.display = "block"
+    orderItems.innerHTML = carrito
+      .map(
+        (item, index) => `
+            <div class="order-item">
+                <div class="order-item-info">
+                    <div class="order-item-name">${item.producto.nombre}</div>
+                    <div class="order-item-price">${formatearMoneda(item.producto.precio * item.cantidad)}</div>
+                    ${item.notas ? `<p class="order-item-notes">📝 ${item.notas}</p>` : ""}
+                </div>
+                <div class="order-item-qty">
+                    <button class="qty-btn" onclick="cambiarCantidad(${index}, -1)">−</button>
+                    <span class="qty-number">${item.cantidad}</span>
+                    <button class="qty-btn" onclick="cambiarCantidad(${index}, 1)">+</button>
+                </div>
+            </div>
+        `,
+      )
+      .join("")
+    if (btnCompleteOrder) btnCompleteOrder.disabled = false
   }
-
-  document.getElementById("modalUsuario").classList.add("active")
+  calcularTotal()
 }
 
-function cerrarModalUsuario() {
-  document.getElementById("modalUsuario").classList.remove("active")
+function cambiarCantidad(index, delta) {
+  const item = carrito[index]
+  item.cantidad = Math.max(1, Math.min(item.producto.stock || 999, item.cantidad + delta))
+  actualizarCarrito()
 }
 
-async function guardarUsuario(event) {
-  event.preventDefault()
+function eliminarItem(index) {
+  carrito.splice(index, 1)
+  actualizarCarrito()
+}
 
-  const id = document.getElementById("usuarioId").value
-  const data = {
-    codigo: document.getElementById("usuarioCodigo").value,
-    nombre: document.getElementById("usuarioNombre").value,
-    email: document.getElementById("usuarioEmail").value,
-    rol: document.getElementById("usuarioRol").value,
-    activo: document.getElementById("usuarioActivo").checked,
+function calcularTotal() {
+  const subtotal = carrito.reduce((sum, item) => sum + item.producto.precio * item.cantidad, 0)
+  const impuestos = subtotal * 0.15
+  const total = subtotal + impuestos
+
+  const subtotalEl = document.getElementById("subtotalAmount")
+  const impuestosEl = document.getElementById("taxAmount")
+  const totalEl = document.getElementById("totalAmount")
+
+  if (subtotalEl) subtotalEl.textContent = formatearMoneda(subtotal)
+  if (impuestosEl) impuestosEl.textContent = formatearMoneda(impuestos)
+  if (totalEl) totalEl.textContent = formatearMoneda(total)
+}
+
+// ==================== FINALIZAR PEDIDO ====================
+
+function completeOrder() {
+  if (carrito.length === 0) {
+    alert("El carrito está vacío")
+    return
   }
+  confirmarPedidoAuto()
+}
 
-  if (!id) {
-    data.password = document.getElementById("usuarioPassword").value
-  }
+function cerrarModalFinalizar() {
+  const modal = document.getElementById("modalFinalizar")
+  if (modal) modal.classList.remove("show")
+}
 
+async function confirmarPedidoAuto() {
   try {
-    const url = id ? `/usuarios/${id}` : "/usuarios"
-    const method = id ? "PUT" : "POST"
+    const subtotal = carrito.reduce((sum, item) => sum + item.producto.precio * item.cantidad, 0)
+    const impuestos = subtotal * 0.15
+    const total = subtotal + impuestos
 
-    const response = await window.apiRequest(url, {
-      method: method,
-      body: JSON.stringify(data),
+    if (!mesaNumero || mesaNumero === "undefined") {
+      alert("Por favor asigna un número de mesa")
+      return
+    }
+
+    const ventaData = {
+      usuarioId: session.id,
+      subtotal: subtotal,
+      impuestos: impuestos,
+      descuento: 0,
+      total: total,
+      numeroMesa: Number.parseInt(mesaNumero, 10),
+      meseroNombre: session.nombre,
+      numeroWhatsapp: window.API_CONFIG.WHATSAPP_NUMBER,
+      nombreCliente: "Cliente",
+      observaciones: `Mesa: ${mesaNumero}`,
+      detalles: carrito.map((item) => ({
+        productoId: item.producto.id,
+        cantidad: item.cantidad,
+        precioUnitario: item.producto.precio,
+        subtotal: item.producto.precio * item.cantidad,
+        notas: item.notas || "",
+      })),
+    }
+
+    console.log("[v0] Sending sale data:", ventaData)
+
+    const ventaResponse = await window.apiRequest("/ventas", {
+      method: "POST",
+      body: JSON.stringify(ventaData),
     })
 
-    if (response?.success) {
-      alert(response.message || "Usuario guardado exitosamente")
-      cerrarModalUsuario()
-      cargarUsuarios()
-      cargarEstadisticas()
-    } else {
-      alert("Error: " + (response?.message || "Error desconocido"))
+    console.log("[v0] Sale response:", ventaResponse)
+
+    if (!ventaResponse || !ventaResponse.success) {
+      throw new Error(ventaResponse?.message || "Error al registrar la venta")
     }
+
+    let mensaje = "🧊 *PEDIDO ICE VIBE* 🧊\n\n"
+    mensaje += `📋 Pedido: ${ventaResponse.numeroVenta || ventaResponse.ventaId || "Nuevo"}\n`
+    mensaje += `🪑 Mesa: ${mesaNumero}\n`
+    mensaje += `👨‍💼 Atendido por: ${session.nombre}\n\n`
+    mensaje += "*PRODUCTOS:*\n"
+
+    carrito.forEach((item) => {
+      mensaje += `\n• ${item.producto.nombre}\n`
+      mensaje += `  Cantidad: ${item.cantidad}\n`
+      mensaje += `  Precio: ${formatearMoneda(item.producto.precio)}\n`
+      if (item.notas) mensaje += `  📝 Especificaciones: ${item.notas}\n`
+      mensaje += `  Subtotal: ${formatearMoneda(item.producto.precio * item.cantidad)}\n`
+    })
+
+    mensaje += `\n━━━━━━━━━━━━━━━━\n`
+    mensaje += `💰 *TOTAL: ${formatearMoneda(total)}*\n\n`
+    mensaje += "¡Gracias por tu pedido! 🎉"
+
+    const telefonoLimpio = window.API_CONFIG.WHATSAPP_NUMBER.replace(/\D/g, "")
+    if (!telefonoLimpio || telefonoLimpio.length < 10) {
+      throw new Error("El número de WhatsApp en config no es válido")
+    }
+
+    const urlWhatsapp = `https://wa.me/${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`
+    window.open(urlWhatsapp, "_blank")
+
+    carrito = []
+    actualizarCarrito()
+    alert("✅ Pedido registrado y enviado a WhatsApp!")
+    cargarProductos()
+
   } catch (error) {
-    console.error("[v0] Error al guardar usuario:", error)
-    alert("Error al guardar usuario: " + error.message)
+    console.error("[v0] Error al confirmar pedido:", error)
+    alert("Error al procesar el pedido: " + error.message)
   }
 }
 
-function editarUsuario(id) {
-  abrirModalUsuario(id)
-}
+async function confirmarPedido() {
+  const modal = document.getElementById("modalFinalizar")
+  if (!modal) return
 
-function cambiarContrasena(id) {
-  const usuario = usuarios.find((u) => u.id === id)
-  if (usuario) {
-    document.getElementById("usuarioIdCambio").value = id
-    document.getElementById("nuevaContrasena").value = ""
-    document.getElementById("confirmarContrasena").value = ""
-    document.getElementById("modalCambiarContrasena").classList.add("active")
-  }
-}
+  const whatsappInput = modal.querySelector("#whatsappNumber")
+  const clientNameInput = modal.querySelector("#clientName")
+  const whatsapp = whatsappInput?.value.trim() || ""
+  const nombreCliente = clientNameInput?.value.trim() || ""
 
-function cerrarModalCambiarContrasena() {
-  document.getElementById("modalCambiarContrasena").classList.remove("active")
-}
-
-async function guardarCambioContrasena(event) {
-  event.preventDefault()
-
-  const nuevaContrasena = document.getElementById("nuevaContrasena").value
-  const confirmarContrasena = document.getElementById("confirmarContrasena").value
-  const usuarioId = document.getElementById("usuarioIdCambio").value
-
-  // Validar que las contraseñas coincidan
-  if (nuevaContrasena !== confirmarContrasena) {
-    alert("Las contraseñas no coinciden")
+  if (!whatsapp) {
+    alert("Por favor ingresa un número de WhatsApp")
     return
   }
 
-  // Validar longitud mínima
-  if (nuevaContrasena.length < 6) {
-    alert("La contraseña debe tener al menos 6 caracteres")
-    return
-  }
-
   try {
-    const response = await window.apiRequest(`/usuarios/${usuarioId}/cambiar-contrasena`, {
-      method: "PUT",
-      body: JSON.stringify({
-        password: nuevaContrasena,
-      }),
+    const subtotal = carrito.reduce((sum, item) => sum + item.producto.precio * item.cantidad, 0)
+    const impuestos = subtotal * 0.15
+    const total = subtotal + impuestos
+
+    const ventaData = {
+      usuarioId: session.id,
+      subtotal,
+      impuestos,
+      descuento: 0,
+      total,
+      observaciones: nombreCliente ? `Cliente: ${nombreCliente}` : "Venta desde POS",
+      detalles: carrito.map((item) => ({
+        productoId: item.producto.id,
+        cantidad: item.cantidad,
+        precioUnitario: item.producto.precio,
+        subtotal: item.producto.precio * item.cantidad,
+        notas: item.notas || "",
+      })),
+    }
+
+    const ventaResponse = await window.apiRequest("/ventas", {
+      method: "POST",
+      body: JSON.stringify(ventaData),
     })
 
-    if (response?.success) {
-      alert(response.message || "Contraseña actualizada exitosamente")
-      cerrarModalCambiarContrasena()
-      cargarUsuarios()
-    } else {
-      alert("Error: " + (response?.message || "Error desconocido"))
+    if (!ventaResponse || !ventaResponse.success) {
+      throw new Error(ventaResponse?.message || "Error al registrar la venta")
     }
+
+    let mensaje = "🧊 *PEDIDO ICE VIBE* 🧊\n\n"
+    if (nombreCliente) mensaje += `👤 Cliente: ${nombreCliente}\n`
+    mensaje += `👨‍💼 Atendido por: ${session.nombre}\n\n`
+    mensaje += "*PRODUCTOS:*\n"
+
+    carrito.forEach((item) => {
+      mensaje += `\n• ${item.producto.nombre}\n`
+      mensaje += `  Cantidad: ${item.cantidad}\n`
+      mensaje += `  Precio: ${formatearMoneda(item.producto.precio)}\n`
+      if (item.notas) mensaje += `  📝 Especificaciones: ${item.notas}\n`
+      mensaje += `  Subtotal: ${formatearMoneda(item.producto.precio * item.cantidad)}\n`
+    })
+
+    mensaje += `\n━━━━━━━━━━━━━━━━\n`
+    mensaje += `💰 *TOTAL: ${formatearMoneda(total)}*\n\n`
+    mensaje += "¡Gracias por tu pedido! 🎉"
+
+    const telefonoLimpio = whatsapp.replace(/\D/g, "")
+    if (!telefonoLimpio || telefonoLimpio.length < 10) {
+      throw new Error("El número de WhatsApp no es válido")
+    }
+
+    window.open(`https://wa.me/${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`, "_blank")
+    carrito = []
+    actualizarCarrito()
+    cerrarModalFinalizar()
+    alert("✅ Pedido registrado exitosamente!")
+    cargarProductos()
+
   } catch (error) {
-    console.error("[v0] Error al cambiar contraseña:", error)
-    alert("Error al cambiar contraseña: " + error.message)
+    console.error("[v0] Error al confirmar pedido:", error)
+    alert("Error al procesar el pedido: " + error.message)
   }
 }
 
-async function eliminarUsuario(id) {
-  if (!confirm("¿Está seguro de eliminar este usuario?")) return
+// ==================== HISTORIAL ====================
 
-  try {
-    const response = await apiRequest(`/usuarios/${id}`, { method: 'DELETE' });
-
-    if (response?.success) {
-      alert(response.message || "Usuario eliminado")
-      await cargarUsuarios()
-      await cargarEstadisticas()
-    } else {
-      alert("Error: " + (response?.message || "Error desconocido"))
-    }
-  } catch (error) {
-    console.error("[v0] Error al eliminar usuario:", error)
-    alert("Error al eliminar usuario")
-  }
+function irAlHistorial() {
+  cargarHistorial()
+  const modal = document.getElementById("modalHistorialMesas")
+  if (modal) modal.classList.add("show")
 }
 
-// ==================== VENTAS ====================
+function cerrarModalHistorialMesas() {
+  const modal = document.getElementById("modalHistorialMesas")
+  if (modal) modal.classList.remove("show")
+}
 
-async function cargarVentas() {
+async function cargarHistorial() {
   try {
-    console.log("[v0] Cargando ventas...")
     const response = await window.apiRequest("/ventas")
-    ventas = Array.isArray(response) ? response : response.data || []
-    console.log("[v0] Ventas cargadas:", ventas.length)
-    mostrarVentas(ventas)
+    historialVentas = Array.isArray(response) ? response : response.data || []
+    mostrarHistorialMesas()
   } catch (error) {
-    console.error("[v0] Error al cargar ventas:", error)
-    document.getElementById("tablaVentas").innerHTML =
-      '<tr><td colspan="6" style="text-align: center; color: #ff3366;">Error al cargar ventas</td></tr>'
+    console.error("[v0] Error al cargar historial:", error)
+    const container = document.getElementById("mesasContainer")
+    if (container) {
+      container.innerHTML =
+        '<p style="color: #ff3366; text-align: center; padding: 40px;">Error al cargar mesas activas</p>'
+    }
   }
 }
 
-function mostrarVentas(lista) {
-  const tbody = document.getElementById("tablaVentas")
+function mostrarHistorialMesas() {
+  const container = document.getElementById("mesasContainer")
+  if (!container) return
 
-  if (lista.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No hay ventas</td></tr>'
+  const mesasMap = {}
+  historialVentas.forEach((venta) => {
+    const numeroMesa = venta.numeroMesa || venta.numero_mesa || "N/A"
+    if (!mesasMap[numeroMesa]) {
+      mesasMap[numeroMesa] = venta
+    } else {
+      if (new Date(venta.fechaVenta) > new Date(mesasMap[numeroMesa].fechaVenta)) {
+        mesasMap[numeroMesa] = venta
+      }
+    }
+  })
+
+  const mesas = Object.entries(mesasMap)
+    .map(([numeroMesa, venta]) => ({ numeroMesa, venta }))
+    .sort((a, b) => new Date(b.venta.fechaVenta) - new Date(a.venta.fechaVenta))
+
+  if (mesas.length === 0) {
+    container.innerHTML =
+      '<p style="color: var(--text-gray); text-align: center; padding: 40px;">No hay mesas activas</p>'
     return
   }
 
-  tbody.innerHTML = lista
+  container.innerHTML = mesas
+    .map(({ numeroMesa, venta }) => {
+      const fecha = new Date(venta.fechaVenta)
+      const horaFormato = fecha.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })
+      const tiempoTranscurrido = Math.floor((Date.now() - fecha.getTime()) / 1000 / 60)
+      const tiempoTexto = tiempoTranscurrido < 1 ? "Hace poco" : `Hace ${tiempoTranscurrido}m`
+
+      return `
+        <div class="historial-item">
+          <div class="historial-header">
+            <div>
+              <strong style="font-size: 1.3em; color: #00ffff;">🪑 MESA ${numeroMesa}</strong>
+              <span class="historial-date">${tiempoTexto}</span>
+            </div>
+            <span class="historial-total">${formatearMoneda(venta.total)}</span>
+          </div>
+          <div class="historial-details">
+            <p><strong>Atendido por:</strong> ${venta.vendedor || session.nombre || "N/A"}</p>
+            <p><strong>Hora:</strong> ${horaFormato}</p>
+            <p><strong>Estado:</strong> <span class="badge badge-success">ACTIVA</span></p>
+          </div>
+          <div style="display: flex; gap: 8px; margin-top: 10px;">
+            <button class="btn-view-details" onclick="verDetallesVentaMesa(${venta.id})" style="flex: 1;">Ver Detalles</button>
+            <button class="btn-view-details" style="background-color: #ff3366; flex: 1;" onclick="marcarMesaComoPaga('${numeroMesa}', ${venta.id})">Mesa Pagó</button>
+          </div>
+        </div>
+      `
+    })
+    .join("")
+}
+
+async function verDetallesVentaMesa(ventaId) {
+  try {
+    const response = await window.apiRequest(`/ventas/${ventaId}`)
+    if (!response || !response.success) throw new Error("No se pudieron cargar los detalles")
+
+    const venta = response.venta
+    const detalles = response.detalles || []
+
+    ventaDetalleActual = venta
+    detallesVentaEditando = JSON.parse(JSON.stringify(detalles))
+
+    const numeroMesa = venta.numeroMesa || venta.numero_mesa || "N/A"
+    document.getElementById("mesaDetalleNumero").textContent = numeroMesa
+    document.getElementById("detalleAtendidoPor").textContent = venta.vendedor || "N/A"
+
+    const fecha = new Date(venta.fechaVenta)
+    document.getElementById("detalleHora").textContent =
+      fecha.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })
+    document.getElementById("detalleTelefono").textContent = venta.numeroWhatsapp || "-"
+
+    const tiempoTranscurrido = Math.floor((Date.now() - fecha.getTime()) / 1000 / 60)
+    document.getElementById("detalleTiempoActiva").textContent =
+      tiempoTranscurrido < 1 ? "Hace poco" : `Hace ${tiempoTranscurrido}m`
+
+    mostrarProductosDelPedido({ detalles })
+
+    document.getElementById("detalleSubtotal").textContent = formatearMoneda(venta.subtotal || 0)
+    document.getElementById("detalleImpuestos").textContent = formatearMoneda(venta.impuestos || 0)
+    document.getElementById("detalleTotal").textContent = formatearMoneda(venta.total || 0)
+
+    const modal = document.getElementById("modalDetallesPedido")
+    if (modal) modal.classList.add("show")
+
+  } catch (error) {
+    console.error("[v0] Error al obtener detalles:", error)
+    alert("Error al cargar los detalles del pedido: " + error.message)
+  }
+}
+
+function mostrarProductosDelPedido(venta) {
+  const container = document.getElementById("detalleProductos")
+  if (!container) return
+
+  const detalles = venta.detalles || venta.items || []
+
+  if (detalles.length === 0) {
+    container.innerHTML = '<p style="color: var(--text-gray); text-align: center;">No hay productos</p>'
+    return
+  }
+
+  container.innerHTML = detalles
     .map(
-      (v) => `
-        <tr>
-            <td>${v.numeroVenta || v.id}</td>
-            <td>${new Date(v.fechaVenta).toLocaleString("es-CO")}</td>
-            <td>${v.vendedor || "N/A"}</td>
-            <td>${formatearMoneda(v.total)}</td>
-            <td><span class="badge badge-success">${v.estado || "COMPLETADA"}</span></td>
-            <td>
-                <button class="btn-icon" onclick="verDetalleVenta(${v.id})" title="Ver detalle">👁️</button>
-            </td>
-        </tr>
+      (detalle, index) => `
+      <div style="background: rgba(0,102,255,0.1); padding: 12px; border-radius: 8px; border-left: 3px solid var(--ice-cyan); display: flex; justify-content: space-between; align-items: center;">
+        <div style="flex: 1;">
+          <p style="color: var(--ice-cyan); font-weight: bold; margin-bottom: 4px;">${detalle.productoNombre || detalle.producto_nombre || "Producto"}</p>
+          <p style="color: var(--text-gray); font-size: 12px;">Cantidad: ${detalle.cantidad} x ${formatearMoneda(detalle.precioUnitario || detalle.precio_unitario || 0)}</p>
+          ${detalle.notas ? `<p style="color: #ffaa00; font-size: 12px;">📝 ${detalle.notas}</p>` : ""}
+          <p style="color: var(--ice-cyan); font-weight: bold; margin-top: 4px;">${formatearMoneda(detalle.subtotal || detalle.cantidad * (detalle.precioUnitario || detalle.precio_unitario || 0))}</p>
+        </div>
+        <button onclick="abrirModalEditarProducto(${index})" style="background: #0066ff; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; margin-left: 10px; font-weight: bold;">Editar</button>
+      </div>
     `,
     )
     .join("")
 }
 
-function filtrarVentas() {
-  const busqueda = document.getElementById("searchVentas").value.toLowerCase()
-  const filtrados = ventas.filter(
-    (v) =>
-      v.numeroVenta.toLowerCase().includes(busqueda) || (v.vendedor && v.vendedor.toLowerCase().includes(busqueda)),
-  )
-  mostrarVentas(filtrados)
+function abrirModalEditarProducto(index) {
+  if (!detallesVentaEditando || !detallesVentaEditando[index]) return
+  productoEditandoIndex = index
+  const detalle = detallesVentaEditando[index]
+  document.getElementById("editProductoNombre").textContent =
+    detalle.productoNombre || detalle.producto_nombre || "Producto"
+  document.getElementById("editCantidadDisplay").textContent = detalle.cantidad
+  const modal = document.getElementById("modalEditarProducto")
+  if (modal) modal.classList.add("show")
 }
 
-async function verDetalleVenta(id) {
-  try {
-    const response = await window.apiRequest(`/ventas/${id}`)
+function cerrarModalEditarProducto() {
+  const modal = document.getElementById("modalEditarProducto")
+  if (modal) modal.classList.remove("show")
+  productoEditandoIndex = null
+}
 
-    if (response?.success) {
-      const venta = response.venta
-      const detalles = response.detalles || []
+function cerrarModalDetallesPedido() {
+  const modal = document.getElementById("modalDetallesPedido")
+  if (modal) modal.classList.remove("show")
+  ventaDetalleActual = null
+  detallesVentaEditando = null
+}
 
-      let mensaje = `VENTA: ${venta.numeroVenta}\n`
-      mensaje += `Fecha: ${new Date(venta.fechaVenta).toLocaleString("es-CO")}\n`
-      mensaje += `Total: ${formatearMoneda(venta.total)}\n\n`
-      mensaje += `PRODUCTOS:\n`
-      detalles.forEach((d) => {
-        mensaje += `- ${d.productoNombre} x${d.cantidad} = ${formatearMoneda(d.subtotal)}\n`
-      })
+function cambiarCantidadEditar(delta) {
+  const cantidadDisplay = document.getElementById("editCantidadDisplay")
+  if (!cantidadDisplay) return
+  let cantidad = Number.parseInt(cantidadDisplay.textContent) || 1
+  cantidad = Math.max(1, cantidad + delta)
+  cantidadDisplay.textContent = cantidad
+}
 
-      alert(mensaje)
-    }
-  } catch (error) {
-    console.error("[v0] Error al ver detalle:", error)
-    alert("Error al cargar detalle de venta")
+function eliminarProductoDelPedido() {
+  if (productoEditandoIndex === null || !detallesVentaEditando) return
+  if (confirm("¿Está seguro que desea eliminar este producto del pedido?")) {
+    detallesVentaEditando.splice(productoEditandoIndex, 1)
+    cerrarModalEditarProducto()
+    mostrarProductosDelPedido({ detalles: detallesVentaEditando })
+    recalcularTotales()
   }
 }
 
-// ==================== REPORTES ====================
-
-async function generarReporteDiario() {
-  try {
-    const { jsPDF } = window.jspdf
-    const doc = new jsPDF()
-    const hoy = new Date().toLocaleDateString("es-CO")
-
-    doc.setFontSize(16)
-    doc.text("Reporte de Ventas - Diario", 20, 20)
-    doc.setFontSize(10)
-    doc.text(`Fecha: ${hoy}`, 20, 30)
-
-    const ventasHoy = ventas.filter((v) => v.fechaVenta && v.fechaVenta.startsWith(hoy.split("/").reverse().join("-")))
-    const totalHoy = ventasHoy.reduce((sum, v) => sum + Number.parseFloat(v.total || 0), 0)
-
-    let y = 45
-    doc.text("Resumen:", 20, y)
-    y += 10
-    doc.text(`Total de ventas: ${ventasHoy.length}`, 20, y)
-    y += 5
-    doc.text(`Total ingresos: ${formatearMoneda(totalHoy)}`, 20, y)
-
-    if (ventasHoy.length > 0) {
-      y += 15
-      doc.text("Detalle de ventas:", 20, y)
-      y += 10
-
-      ventasHoy.forEach((venta, idx) => {
-        if (y > 270) {
-          doc.addPage()
-          y = 20
-        }
-        doc.setFontSize(9)
-        doc.text(`${idx + 1}. ${venta.numeroVenta || venta.id} - ${formatearMoneda(venta.total)}`, 20, y)
-        y += 5
-      })
-    }
-
-    doc.save(`reporte_diario_${new Date().toISOString().split("T")[0]}.pdf`)
-    alert("Reporte diario descargado")
-  } catch (error) {
-    console.error("Error al generar reporte:", error)
-    alert("Error al generar reporte: " + error.message)
-  }
+function guardarCambiosProducto() {
+  if (productoEditandoIndex === null || !detallesVentaEditando) return
+  const cantidadDisplay = document.getElementById("editCantidadDisplay")
+  const nuevaCantidad = Number.parseInt(cantidadDisplay?.textContent || 1)
+  detallesVentaEditando[productoEditandoIndex].cantidad = nuevaCantidad
+  cerrarModalEditarProducto()
+  mostrarProductosDelPedido({ detalles: detallesVentaEditando })
+  recalcularTotales()
 }
 
-async function generarReporteSemanal() {
+function recalcularTotales() {
+  if (!detallesVentaEditando) return
+  const subtotal = detallesVentaEditando.reduce((sum, det) => {
+    return sum + det.cantidad * (det.precioUnitario || det.precio_unitario || 0)
+  }, 0)
+  const impuestos = subtotal * 0.15
+  const total = subtotal + impuestos
+  document.getElementById("detalleSubtotal").textContent = formatearMoneda(subtotal)
+  document.getElementById("detalleImpuestos").textContent = formatearMoneda(impuestos)
+  document.getElementById("detalleTotal").textContent = formatearMoneda(total)
+}
+
+function agregarProductosAlPedido() {
+  if (!ventaDetalleActual) return
+  const numeroMesa = ventaDetalleActual.numeroMesa || ventaDetalleActual.numero_mesa || mesaNumero
+  mesaNumero = numeroMesa
+  document.getElementById("mesaDisplay").textContent = mesaNumero
+  cerrarModalDetallesPedido()
+  cerrarModalHistorialMesas()
+  alert("Mesa cambiada a " + numeroMesa + ". Ahora puedes agregar productos a este pedido.")
+}
+
+async function enviarPedidoActualizadoWhatsApp() {
+  if (!ventaDetalleActual || !detallesVentaEditando) return
   try {
-    const { jsPDF } = window.jspdf
-    const doc = new jsPDF()
-    const hoy = new Date()
-    const hace7Dias = new Date(hoy.getTime() - 7 * 24 * 60 * 60 * 1000)
+    const numeroMesa = ventaDetalleActual.numeroMesa || ventaDetalleActual.numero_mesa || "N/A"
+    const subtotal = detallesVentaEditando.reduce((sum, det) => {
+      return sum + det.cantidad * (det.precioUnitario || det.precio_unitario || 0)
+    }, 0)
+    const total = subtotal + subtotal * 0.15
 
-    doc.setFontSize(16)
-    doc.text("Reporte de Ventas - Semanal", 20, 20)
-    doc.setFontSize(10)
-    doc.text(`Período: ${hace7Dias.toLocaleDateString("es-CO")} - ${hoy.toLocaleDateString("es-CO")}`, 20, 30)
+    let mensaje = "🧊 *PEDIDO ICE VIBE - ACTUALIZADO* 🧊\n\n"
+    mensaje += `📋 Pedido: ${ventaDetalleActual.id}\n`
+    mensaje += `🪑 Mesa: ${numeroMesa}\n`
+    mensaje += `👨‍💼 Atendido por: ${ventaDetalleActual.vendedor || session.nombre || "N/A"}\n\n`
+    mensaje += "*PRODUCTOS:*\n"
 
-    const ventasSemana = ventas.filter((v) => {
-      const fechaVenta = new Date(v.fechaVenta)
-      return fechaVenta >= hace7Dias && fechaVenta <= hoy
+    detallesVentaEditando.forEach((detalle) => {
+      const nombre = detalle.productoNombre || detalle.producto_nombre || "Producto"
+      const precio = detalle.precioUnitario || detalle.precio_unitario || 0
+      mensaje += `\n• ${nombre}\n`
+      mensaje += `  Cantidad: ${detalle.cantidad}\n`
+      mensaje += `  Precio: ${formatearMoneda(precio)}\n`
+      if (detalle.notas) mensaje += `  📝 Especificaciones: ${detalle.notas}\n`
+      mensaje += `  Subtotal: ${formatearMoneda(detalle.cantidad * precio)}\n`
     })
-    const totalSemana = ventasSemana.reduce((sum, v) => sum + Number.parseFloat(v.total || 0), 0)
 
-    let y = 45
-    doc.text("Resumen:", 20, y)
-    y += 10
-    doc.text(`Total de ventas: ${ventasSemana.length}`, 20, y)
-    y += 5
-    doc.text(`Total ingresos: ${formatearMoneda(totalSemana)}`, 20, y)
-    doc.text(`Promedio por venta: ${formatearMoneda(totalSemana / ventasSemana.length || 0)}`, 20, y + 5)
+    mensaje += `\n━━━━━━━━━━━━━━━━\n`
+    mensaje += `💰 *TOTAL: ${formatearMoneda(total)}*\n\n`
+    mensaje += "¡Gracias por tu pedido! 🎉"
 
-    if (ventasSemana.length > 0) {
-      y += 20
-      doc.text("Detalle de ventas:", 20, y)
-      y += 10
+    const telefono =
+      ventaDetalleActual.numeroWhatsapp || ventaDetalleActual.numero_whatsapp || window.API_CONFIG.WHATSAPP_NUMBER
+    const telefonoLimpio = telefono.replace(/\D/g, "")
 
-      ventasSemana.forEach((venta, idx) => {
-        if (y > 270) {
-          doc.addPage()
-          y = 20
-        }
-        doc.setFontSize(9)
-        doc.text(
-          `${idx + 1}. ${venta.numeroVenta || venta.id} - ${new Date(venta.fechaVenta).toLocaleDateString("es-CO")} - ${formatearMoneda(venta.total)}`,
-          20,
-          y,
-        )
-        y += 5
-      })
+    if (!telefonoLimpio || telefonoLimpio.length < 10) {
+      alert("No hay número de WhatsApp válido configurado")
+      return
     }
 
-    doc.save(`reporte_semanal_${new Date().toISOString().split("T")[0]}.pdf`)
-    alert("Reporte semanal descargado")
+    window.open(`https://wa.me/${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`, "_blank")
+
   } catch (error) {
-    console.error("Error al generar reporte:", error)
-    alert("Error al generar reporte: " + error.message)
+    console.error("[v0] Error al enviar WhatsApp:", error)
+    alert("Error al enviar por WhatsApp: " + error.message)
   }
 }
 
-async function generarReporteMensual() {
-  try {
-    const { jsPDF } = window.jspdf
-    const doc = new jsPDF()
-    const hoy = new Date()
-    const hace30Dias = new Date(hoy.getTime() - 30 * 24 * 60 * 60 * 1000)
-
-    doc.setFontSize(16)
-    doc.text("Reporte de Ventas - Mensual", 20, 20)
-    doc.setFontSize(10)
-    doc.text(`Período: ${hace30Dias.toLocaleDateString("es-CO")} - ${hoy.toLocaleDateString("es-CO")}`, 20, 30)
-
-    const ventasMes = ventas.filter((v) => {
-      const fechaVenta = new Date(v.fechaVenta)
-      return fechaVenta >= hace30Dias && fechaVenta <= hoy
-    })
-    const totalMes = ventasMes.reduce((sum, v) => sum + Number.parseFloat(v.total || 0), 0)
-
-    let y = 45
-    doc.text("Resumen:", 20, y)
-    y += 10
-    doc.text(`Total de ventas: ${ventasMes.length}`, 20, y)
-    y += 5
-    doc.text(`Total ingresos: ${formatearMoneda(totalMes)}`, 20, y)
-    doc.text(`Promedio por venta: ${formatearMoneda(totalMes / ventasMes.length || 0)}`, 20, y + 5)
-
-    if (ventasMes.length > 0) {
-      y += 20
-      doc.text("Detalle de ventas:", 20, y)
-      y += 10
-
-      ventasMes.forEach((venta, idx) => {
-        if (y > 270) {
-          doc.addPage()
-          y = 20
-        }
-        doc.setFontSize(9)
-        doc.text(
-          `${idx + 1}. ${venta.numeroVenta || venta.id} - ${new Date(venta.fechaVenta).toLocaleDateString("es-CO")} - ${formatearMoneda(venta.total)}`,
-          20,
-          y,
-        )
-        y += 5
-      })
+async function marcarMesaComoPaga(numeroMesa, ventaId) {
+  if (confirm(`¿La mesa ${numeroMesa} ya pagó y se fue?`)) {
+    try {
+      // Liberar la mesa en el backend
+      await window.apiRequest(`/mesas/${numeroMesa}/liberar`, { method: "POST" })
+    } catch (e) {
+      console.warn("[v0] No se pudo liberar mesa en backend:", e)
     }
-
-    doc.save(`reporte_mensual_${new Date().toISOString().split("T")[0]}.pdf`)
-    alert("Reporte mensual descargado")
-  } catch (error) {
-    console.error("Error al generar reporte:", error)
-    alert("Error al generar reporte: " + error.message)
+    alert(`✅ Mesa ${numeroMesa} marcada como pagada.`)
+    cargarHistorial()
   }
 }
 
@@ -697,45 +758,37 @@ function formatearMoneda(valor) {
   }).format(valor)
 }
 
-async function eliminarTodasLasVentas() {
-  // Triple confirmación para seguridad
-  const confirmacion1 = confirm("⚠️ ADVERTENCIA: Esto eliminará TODAS las ventas de prueba.\n\n¿Está seguro?")
-  if (!confirmacion1) return
+function irANuevaOrden() {
+  carrito = []
+  actualizarCarrito()
+  categoriaActual = "TODAS"
+  const btns = document.querySelectorAll(".category-btn")
+  if (btns.length > 0) btns[0].click()
+}
 
-  const confirmacion2 = confirm("⚠️ Esta acción NO se puede deshacer.\n\n¿Está REALMENTE seguro?")
-  if (!confirmacion2) return
+function marcarMesaComoPagaConfirm() {
+  if (!ventaDetalleActual) { alert("No hay detalles de pedido cargados"); return }
+  const numeroMesa = ventaDetalleActual.numeroMesa || ventaDetalleActual.numero_mesa || "N/A"
+  const ventaId = ventaDetalleActual.id
+  marcarMesaComoPaga(numeroMesa, ventaId)
+    .then(() => cerrarModalDetallesPedido())
+}
 
-  const inputUser = prompt("⚠️ Escriba 'LIMPIAR' para confirmar:")
-  if (inputUser !== "LIMPIAR") {
-    alert("Operación cancelada")
-    return
-  }
+async function enviarPedidoWhatsApp() {
+  await enviarPedidoActualizadoWhatsApp()
+}
 
-  try {
-    console.log("[v0] Eliminando todas las ventas...")
-
-    // Eliminar cada venta
-    const ventasAEliminar = [...ventas]
-    for (const venta of ventasAEliminar) {
-      await window.apiRequest(`/ventas/${venta.id}`, {
-        method: "DELETE",
-      })
-    }
-
-    alert("✅ Base de datos limpiada. Todas las ventas han sido eliminadas.")
-
-    // Recargar datos
-    await cargarVentas()
-    await cargarEstadisticas()
-  } catch (error) {
-    console.error("[v0] Error al limpiar BD:", error)
-    alert("Error al limpiar la base de datos: " + error.message)
+function filtrarMesas(filtro) {
+  document.querySelectorAll(".btn-filter").forEach((btn) => btn.classList.remove("active"))
+  event.target.classList.add("active")
+  if (filtro === "TODAS" || filtro === "ACTIVAS") {
+    mostrarHistorialMesas()
   }
 }
 
-function cerrarSesion() {
+function logout() {
   if (confirm("¿Está seguro de cerrar sesión?")) {
-    sessionStorage.removeItem("session")
+    sessionStorage.removeItem("tabSession")
     window.location.href = "index.html"
   }
 }

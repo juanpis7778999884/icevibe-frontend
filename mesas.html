@@ -1,741 +1,809 @@
-// Get session from localStorage (set by auth.js)
-function getSession() {
-  const sessionData = localStorage.getItem("session")
-  if (!sessionData) {
-    console.error("[v0] No session found")
-    window.location.href = "index.html"
-    return null
-  }
-  return JSON.parse(sessionData)
-}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ice Vibe - Mesas</title>
+  <link rel="stylesheet" href="css/pos-styles.css" />
+  <style>
+    body { overflow: auto; }
 
-const session = getSession()
-
-if (!session || session.rol !== "ADMIN") {
-  alert("Acceso denegado. Solo administradores pueden acceder.")
-  window.location.href = "index.html"
-}
-
-// Verificar que API está disponible
-if (!window.apiRequest) {
-  console.error("[v0] apiRequest no está disponible. Verifica que config.js está cargado.")
-}
-
-let productos = []
-let usuarios = []
-let ventas = []
-
-// Cargar datos al iniciar
-document.addEventListener("DOMContentLoaded", () => {
-  const nombreAdmin = document.getElementById("adminName")
-  if (nombreAdmin) {
-    nombreAdmin.textContent = session.nombre
-  }
-
-  cargarEstadisticas()
-  cargarProductos()
-  cargarUsuarios()
-  cargarVentas()
-
-  // Event listeners para búsqueda
-  document.getElementById("searchProductos")?.addEventListener("input", filtrarProductos)
-  document.getElementById("searchUsuarios")?.addEventListener("input", filtrarUsuarios)
-  document.getElementById("searchVentas")?.addEventListener("input", filtrarVentas)
-
-  // Event listeners para reportes
-  document.getElementById("generarReporteDiario")?.addEventListener("click", generarReporteDiario)
-  document.getElementById("generarReporteSemanal")?.addEventListener("click", generarReporteSemanal)
-  document.getElementById("generarReporteMensual")?.addEventListener("click", generarReporteMensual)
-
-  // Event listener para eliminar todas las ventas
-  document.getElementById("eliminarTodasLasVentas")?.addEventListener("click", eliminarTodasLasVentas)
-})
-
-// ==================== ESTADÍSTICAS ====================
-
-async function cargarEstadisticas() {
-  try {
-    console.log("[v0] Cargando estadísticas...")
-
-    const [productosRes, ventasRes] = await Promise.all([window.apiRequest("/productos"), window.apiRequest("/ventas")])
-
-    const productos = Array.isArray(productosRes) ? productosRes : productosRes.data || []
-    const ventas = Array.isArray(ventasRes) ? ventasRes : ventasRes.data || []
-
-    const hoy = new Date()
-    const ventasHoy = ventas.filter((v) => {
-      if (!v.fechaVenta) return false
-      const fechaVenta = new Date(v.fechaVenta)
-      return (
-        fechaVenta.getDate() === hoy.getDate() &&
-        fechaVenta.getMonth() === hoy.getMonth() &&
-        fechaVenta.getFullYear() === hoy.getFullYear()
-      )
-    })
-
-    const totalHoy = ventasHoy.reduce((sum, v) => sum + Number.parseFloat(v.total || 0), 0)
-    const stockBajo = productos.filter((p) => p.stock <= (p.stockMinimo || 5)).length
-
-    document.getElementById("ventasHoy").textContent = ventasHoy.length
-    document.getElementById("ingresosHoy").textContent = formatearMoneda(totalHoy)
-    document.getElementById("totalProductos").textContent = productos.filter((p) => p.activo).length
-    document.getElementById("stockBajo").textContent = stockBajo
-  } catch (error) {
-    console.error("[v0] Error al cargar estadísticas:", error)
-  }
-}
-
-// ==================== TABS ====================
-
-function cambiarTab(tab) {
-  document.querySelectorAll(".tab-btn").forEach((btn) => btn.classList.remove("active"))
-  document.querySelectorAll(".tab-content").forEach((content) => content.classList.remove("active"))
-
-  event.target.classList.add("active")
-  document.getElementById(`tab-${tab}`)?.classList.add("active")
-}
-
-// ==================== PRODUCTOS ====================
-
-async function cargarProductos() {
-  try {
-    console.log("[v0] Cargando productos...")
-    const response = await window.apiRequest("/productos")
-    productos = Array.isArray(response) ? response : response.data || []
-    console.log("[v0] Productos cargados:", productos.length)
-    mostrarProductos(productos)
-  } catch (error) {
-    console.error("[v0] Error al cargar productos:", error)
-    document.getElementById("tablaProductos").innerHTML =
-      '<tr><td colspan="7" style="text-align: center; color: #ff3366;">Error al cargar productos</td></tr>'
-  }
-}
-
-function mostrarProductos(lista) {
-  const tbody = document.getElementById("tablaProductos")
-
-  if (lista.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No hay productos</td></tr>'
-    return
-  }
-
-  tbody.innerHTML = lista
-    .map(
-      (p) => `
-        <tr>
-            <td>${p.codigo}</td>
-            <td>${p.nombre}</td>
-            <td>${p.categoria}</td>
-            <td>${formatearMoneda(p.precio)}</td>
-            <td>
-                <span class="badge ${p.stock <= (p.stockMinimo || 5) ? "badge-danger" : "badge-success"}">
-                    ${p.stock}
-                </span>
-            </td>
-            <td>
-                <span class="badge ${p.activo ? "badge-success" : "badge-danger"}">
-                    ${p.activo ? "Activo" : "Inactivo"}
-                </span>
-            </td>
-            <td>
-                <button class="btn-icon" onclick="editarProducto(${p.id})" title="Editar">✏️</button>
-                <button class="btn-icon" onclick="eliminarProducto(${p.id})" title="Eliminar">🗑️</button>
-            </td>
-        </tr>
-    `,
-    )
-    .join("")
-}
-
-function filtrarProductos() {
-  const busqueda = document.getElementById("searchProductos").value.toLowerCase()
-  const filtrados = productos.filter(
-    (p) =>
-      p.nombre.toLowerCase().includes(busqueda) ||
-      p.codigo.toLowerCase().includes(busqueda) ||
-      p.categoria.toLowerCase().includes(busqueda),
-  )
-  mostrarProductos(filtrados)
-}
-
-function abrirModalProducto(id = null) {
-  document.getElementById("modalProductoTitulo").textContent = id ? "Editar Producto" : "Nuevo Producto"
-  document.getElementById("formProducto").reset()
-  document.getElementById("productoId").value = ""
-  document.getElementById("productoActivo").checked = true
-
-  if (id) {
-    const producto = productos.find((p) => p.id === id)
-    if (producto) {
-      document.getElementById("productoId").value = producto.id
-      document.getElementById("productoCodigo").value = producto.codigo
-      document.getElementById("productoNombre").value = producto.nombre
-      document.getElementById("productoCategoria").value = producto.categoria
-      document.getElementById("productoPrecio").value = producto.precio
-      document.getElementById("productoStock").value = producto.stock
-      document.getElementById("productoStockMinimo").value = producto.stockMinimo || 5
-      document.getElementById("productoDescripcion").value = producto.descripcion || ""
-      document.getElementById("productoActivo").checked = producto.activo
-      document.getElementById("productoCodigo").readOnly = true
+    .mesas-header {
+      background: linear-gradient(135deg, #1a1f3a 0%, #1e2442 100%);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(0,191,255,0.2);
+      position: sticky;
+      top: 0;
+      z-index: 100;
     }
-  } else {
-    document.getElementById("productoCodigo").readOnly = false
-  }
+    .mesas-header h1 { font-size: 1.3rem; color: #00e5ff; }
+    .mesas-header p  { font-size: 0.8rem; color: #a0aec0; margin-top: 2px; }
+    .header-actions  { display: flex; gap: 10px; align-items: center; }
 
-  document.getElementById("modalProducto").classList.add("active")
-}
-
-function cerrarModalProducto() {
-  document.getElementById("modalProducto").classList.remove("active")
-}
-
-async function guardarProducto(event) {
-  event.preventDefault()
-
-  const id = document.getElementById("productoId").value
-  const data = {
-    codigo: document.getElementById("productoCodigo").value,
-    nombre: document.getElementById("productoNombre").value,
-    categoria: document.getElementById("productoCategoria").value,
-    precio: Number.parseFloat(document.getElementById("productoPrecio").value),
-    stock: Number.parseInt(document.getElementById("productoStock").value),
-    stockMinimo: Number.parseInt(document.getElementById("productoStockMinimo").value),
-    descripcion: document.getElementById("productoDescripcion").value,
-    activo: document.getElementById("productoActivo").checked,
-  }
-
-  try {
-    const url = id ? `/productos/${id}` : "/productos"
-    const method = id ? "PUT" : "POST"
-
-    const response = await window.apiRequest(url, {
-      method: method,
-      body: JSON.stringify(data),
-    })
-
-    if (response?.success) {
-      alert(response.message || "Producto guardado exitosamente")
-      cerrarModalProducto()
-      cargarProductos()
-      cargarEstadisticas()
-
-      console.log("[v0] Producto actualizado. Los precios en POS se sincronizarán automáticamente.")
-    } else {
-      alert("Error: " + (response?.message || "Error desconocido"))
+    .btn-back {
+      background: rgba(0,191,255,0.1);
+      border: 1px solid rgba(0,191,255,0.3);
+      color: #00bfff;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all .2s;
+      text-decoration: none;
+      display: inline-block;
     }
-  } catch (error) {
-    console.error("[v0] Error al guardar producto:", error)
-    alert("Error al guardar producto: " + error.message)
-  }
-}
+    .btn-back:hover { background: rgba(0,191,255,0.2); }
 
-function editarProducto(id) {
-  abrirModalProducto(id)
-}
-
-async function eliminarProducto(id) {
-  if (!confirm("¿Está seguro de eliminar este producto?")) return
-
-  try {
-    const response = await apiRequest(`/productos/${id}`, { method: 'DELETE' });
-
-    if (response?.success) {
-      alert(response.message || "Producto eliminado")
-      await cargarProductos()
-      await cargarEstadisticas()
-    } else {
-      alert("Error: " + (response?.message || "Error desconocido"))
+    .leyenda {
+      display: flex;
+      gap: 20px;
+      padding: 14px 24px;
+      background: rgba(255,255,255,0.02);
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      flex-wrap: wrap;
     }
-  } catch (error) {
-    console.error("[v0] Error al eliminar producto:", error)
-    alert("Error al eliminar producto")
-  }
-}
+    .leyenda-item { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: #a0aec0; }
+    .leyenda-dot  { width: 14px; height: 14px; border-radius: 50%; }
+    .dot-libre    { background: #10b981; box-shadow: 0 0 8px rgba(16,185,129,.6); }
+    .dot-ocupada  { background: #ef4444; box-shadow: 0 0 8px rgba(239,68,68,.6); }
 
-// ==================== USUARIOS ====================
-
-async function cargarUsuarios() {
-  try {
-    console.log("[v0] Cargando usuarios...")
-    const response = await window.apiRequest("/usuarios")
-    usuarios = Array.isArray(response) ? response : response.data || []
-    console.log("[v0] Usuarios cargados:", usuarios.length)
-    mostrarUsuarios(usuarios)
-  } catch (error) {
-    console.error("[v0] Error al cargar usuarios:", error)
-    document.getElementById("tablaUsuarios").innerHTML =
-      '<tr><td colspan="6" style="text-align: center; color: #ff3366;">Error al cargar usuarios</td></tr>'
-  }
-}
-
-function mostrarUsuarios(lista) {
-  const tbody = document.getElementById("tablaUsuarios")
-
-  if (lista.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No hay usuarios</td></tr>'
-    return
-  }
-
-  tbody.innerHTML = lista
-    .map(
-      (u) => `
-        <tr>
-            <td>${u.codigo}</td>
-            <td>${u.nombre}</td>
-            <td>${u.email}</td>
-            <td><span class="badge badge-success">${u.rol}</span></td>
-            <td>
-                <span class="badge ${u.activo ? "badge-success" : "badge-danger"}">
-                    ${u.activo ? "Activo" : "Inactivo"}
-                </span>
-            </td>
-            <td>
-                <button class="btn-icon" onclick="editarUsuario(${u.id})" title="Editar">✏️</button>
-                <button class="btn-icon" onclick="cambiarContrasena(${u.id})" title="Cambiar Contraseña">🔐</button>
-                <button class="btn-icon" onclick="eliminarUsuario(${u.id})" title="Eliminar">🗑️</button>
-            </td>
-        </tr>
-    `,
-    )
-    .join("")
-}
-
-function filtrarUsuarios() {
-  const busqueda = document.getElementById("searchUsuarios").value.toLowerCase()
-  const filtrados = usuarios.filter(
-    (u) =>
-      u.nombre.toLowerCase().includes(busqueda) ||
-      u.codigo.toLowerCase().includes(busqueda) ||
-      u.email.toLowerCase().includes(busqueda),
-  )
-  mostrarUsuarios(filtrados)
-}
-
-function abrirModalUsuario(id = null) {
-  document.getElementById("modalUsuarioTitulo").textContent = id ? "Editar Usuario" : "Nuevo Usuario"
-  document.getElementById("formUsuario").reset()
-  document.getElementById("usuarioId").value = ""
-  document.getElementById("usuarioActivo").checked = true
-
-  if (id) {
-    const usuario = usuarios.find((u) => u.id === id)
-    if (usuario) {
-      document.getElementById("usuarioId").value = usuario.id
-      document.getElementById("usuarioCodigo").value = usuario.codigo
-      document.getElementById("usuarioNombre").value = usuario.nombre
-      document.getElementById("usuarioEmail").value = usuario.email
-      document.getElementById("usuarioRol").value = usuario.rol
-      document.getElementById("usuarioActivo").checked = usuario.activo
-      document.getElementById("usuarioCodigo").readOnly = true
-      document.getElementById("passwordGroup").style.display = "none"
+    .mesas-container {
+      padding: 24px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 16px;
+      max-width: 1200px;
+      margin: 0 auto;
     }
-  } else {
-    document.getElementById("usuarioCodigo").readOnly = false
-    document.getElementById("passwordGroup").style.display = "block"
-  }
 
-  document.getElementById("modalUsuario").classList.add("active")
-}
-
-function cerrarModalUsuario() {
-  document.getElementById("modalUsuario").classList.remove("active")
-}
-
-async function guardarUsuario(event) {
-  event.preventDefault()
-
-  const id = document.getElementById("usuarioId").value
-  const data = {
-    codigo: document.getElementById("usuarioCodigo").value,
-    nombre: document.getElementById("usuarioNombre").value,
-    email: document.getElementById("usuarioEmail").value,
-    rol: document.getElementById("usuarioRol").value,
-    activo: document.getElementById("usuarioActivo").checked,
-  }
-
-  if (!id) {
-    data.password = document.getElementById("usuarioPassword").value
-  }
-
-  try {
-    const url = id ? `/usuarios/${id}` : "/usuarios"
-    const method = id ? "PUT" : "POST"
-
-    const response = await window.apiRequest(url, {
-      method: method,
-      body: JSON.stringify(data),
-    })
-
-    if (response?.success) {
-      alert(response.message || "Usuario guardado exitosamente")
-      cerrarModalUsuario()
-      cargarUsuarios()
-      cargarEstadisticas()
-    } else {
-      alert("Error: " + (response?.message || "Error desconocido"))
+    .mesa-card {
+      background: linear-gradient(135deg, #1a1f3a 0%, #1e2442 100%);
+      border-radius: 14px;
+      padding: 18px 12px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .25s;
+      border: 2px solid transparent;
+      user-select: none;
     }
-  } catch (error) {
-    console.error("[v0] Error al guardar usuario:", error)
-    alert("Error al guardar usuario: " + error.message)
-  }
-}
+    .mesa-card:hover { transform: translateY(-4px); }
+    .mesa-card.libre   { border-color: rgba(16,185,129,.4); box-shadow: 0 0 12px rgba(16,185,129,.15); }
+    .mesa-card.libre:hover { border-color: #10b981; box-shadow: 0 0 20px rgba(16,185,129,.35); }
+    .mesa-card.ocupada { border-color: rgba(239,68,68,.5); box-shadow: 0 0 12px rgba(239,68,68,.2); }
+    .mesa-card.ocupada:hover { border-color: #ef4444; box-shadow: 0 0 20px rgba(239,68,68,.4); }
 
-function editarUsuario(id) {
-  abrirModalUsuario(id)
-}
+    .mesa-numero { font-size: 1.8rem; font-weight: 700; color: #fff; line-height: 1; }
+    .mesa-label  { font-size: 0.65rem; color: #a0aec0; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+    .mesa-estado { margin-top: 10px; font-size: 0.72rem; font-weight: 600; padding: 3px 10px; border-radius: 20px; display: inline-block; }
+    .estado-libre   { background: rgba(16,185,129,.15); color: #10b981; }
+    .estado-ocupada { background: rgba(239,68,68,.15);  color: #ef4444; }
+    .mesa-total  { margin-top: 6px; font-size: 0.75rem; color: #00e5ff; font-weight: 600; }
+    .mesa-mesero { margin-top: 3px; font-size: 0.68rem; color: #a0aec0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-function cambiarContrasena(id) {
-  const usuario = usuarios.find((u) => u.id === id)
-  if (usuario) {
-    document.getElementById("usuarioIdCambio").value = id
-    document.getElementById("nuevaContrasena").value = ""
-    document.getElementById("confirmarContrasena").value = ""
-    document.getElementById("modalCambiarContrasena").classList.add("active")
-  }
-}
-
-function cerrarModalCambiarContrasena() {
-  document.getElementById("modalCambiarContrasena").classList.remove("active")
-}
-
-async function guardarCambioContrasena(event) {
-  event.preventDefault()
-
-  const nuevaContrasena = document.getElementById("nuevaContrasena").value
-  const confirmarContrasena = document.getElementById("confirmarContrasena").value
-  const usuarioId = document.getElementById("usuarioIdCambio").value
-
-  // Validar que las contraseñas coincidan
-  if (nuevaContrasena !== confirmarContrasena) {
-    alert("Las contraseñas no coinciden")
-    return
-  }
-
-  // Validar longitud mínima
-  if (nuevaContrasena.length < 6) {
-    alert("La contraseña debe tener al menos 6 caracteres")
-    return
-  }
-
-  try {
-    const response = await window.apiRequest(`/usuarios/${usuarioId}/cambiar-contrasena`, {
-      method: "PUT",
-      body: JSON.stringify({
-        password: nuevaContrasena,
-      }),
-    })
-
-    if (response?.success) {
-      alert(response.message || "Contraseña actualizada exitosamente")
-      cerrarModalCambiarContrasena()
-      cargarUsuarios()
-    } else {
-      alert("Error: " + (response?.message || "Error desconocido"))
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.85); z-index: 1000;
+      align-items: flex-start; justify-content: center;
+      padding: 16px; overflow-y: auto;
     }
-  } catch (error) {
-    console.error("[v0] Error al cambiar contraseña:", error)
-    alert("Error al cambiar contraseña: " + error.message)
-  }
-}
+    .modal-overlay.show { display: flex; }
 
-async function eliminarUsuario(id) {
-  if (!confirm("¿Está seguro de eliminar este usuario?")) return
+    .stat-bar { display: flex; gap: 20px; padding: 12px 24px; background: rgba(0,0,0,.2); font-size: 0.82rem; flex-wrap: wrap; }
+    .stat-bar span   { color: #a0aec0; }
+    .stat-bar strong { color: #00e5ff; }
 
-  try {
-    const response = await apiRequest(`/usuarios/${id}`, { method: 'DELETE' });
-
-    if (response?.success) {
-      alert(response.message || "Usuario eliminado")
-      await cargarUsuarios()
-      await cargarEstadisticas()
-    } else {
-      alert("Error: " + (response?.message || "Error desconocido"))
+    .refresh-btn {
+      background: rgba(0,191,255,.1); border: 1px solid rgba(0,191,255,.3);
+      color: #00bfff; padding: 8px 14px; border-radius: 8px; cursor: pointer;
+      font-size: 0.82rem; transition: all .2s;
     }
-  } catch (error) {
-    console.error("[v0] Error al eliminar usuario:", error)
-    alert("Error al eliminar usuario")
-  }
-}
+    .refresh-btn:hover { background: rgba(0,191,255,.2); }
 
-// ==================== VENTAS ====================
+    .empty-state { text-align: center; padding: 20px; color: #a0aec0; font-size: 0.85rem; }
+    .loading     { text-align: center; padding: 60px; color: #a0aec0; }
 
-async function cargarVentas() {
-  try {
-    console.log("[v0] Cargando ventas...")
-    const response = await window.apiRequest("/ventas")
-    ventas = Array.isArray(response) ? response : response.data || []
-    console.log("[v0] Ventas cargadas:", ventas.length)
-    mostrarVentas(ventas)
-  } catch (error) {
-    console.error("[v0] Error al cargar ventas:", error)
-    document.getElementById("tablaVentas").innerHTML =
-      '<tr><td colspan="6" style="text-align: center; color: #ff3366;">Error al cargar ventas</td></tr>'
-  }
-}
-
-function mostrarVentas(lista) {
-  const tbody = document.getElementById("tablaVentas")
-
-  if (lista.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No hay ventas</td></tr>'
-    return
-  }
-
-  tbody.innerHTML = lista
-    .map(
-      (v) => `
-        <tr>
-            <td>${v.numeroVenta || v.id}</td>
-            <td>${new Date(v.fechaVenta).toLocaleString("es-CO")}</td>
-            <td>${v.vendedor || "N/A"}</td>
-            <td>${formatearMoneda(v.total)}</td>
-            <td><span class="badge badge-success">${v.estado || "COMPLETADA"}</span></td>
-            <td>
-                <button class="btn-icon" onclick="verDetalleVenta(${v.id})" title="Ver detalle">👁️</button>
-            </td>
-        </tr>
-    `,
-    )
-    .join("")
-}
-
-function filtrarVentas() {
-  const busqueda = document.getElementById("searchVentas").value.toLowerCase()
-  const filtrados = ventas.filter(
-    (v) =>
-      v.numeroVenta.toLowerCase().includes(busqueda) || (v.vendedor && v.vendedor.toLowerCase().includes(busqueda)),
-  )
-  mostrarVentas(filtrados)
-}
-
-async function verDetalleVenta(id) {
-  try {
-    const response = await window.apiRequest(`/ventas/${id}`)
-
-    if (response?.success) {
-      const venta = response.venta
-      const detalles = response.detalles || []
-
-      let mensaje = `VENTA: ${venta.numeroVenta}\n`
-      mensaje += `Fecha: ${new Date(venta.fechaVenta).toLocaleString("es-CO")}\n`
-      mensaje += `Total: ${formatearMoneda(venta.total)}\n\n`
-      mensaje += `PRODUCTOS:\n`
-      detalles.forEach((d) => {
-        mensaje += `- ${d.productoNombre} x${d.cantidad} = ${formatearMoneda(d.subtotal)}\n`
-      })
-
-      alert(mensaje)
+    .cat-btn-pos {
+      background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1);
+      color: #a0aec0; padding: 5px 12px; border-radius: 20px; cursor: pointer;
+      font-size: 0.75rem; white-space: nowrap; transition: all .2s; flex-shrink: 0;
     }
-  } catch (error) {
-    console.error("[v0] Error al ver detalle:", error)
-    alert("Error al cargar detalle de venta")
-  }
-}
+    .cat-btn-pos.active, .cat-btn-pos:hover {
+      background: rgba(0,191,255,.15); border-color: rgba(0,191,255,.4); color: #00e5ff;
+    }
+    .prod-card-pos {
+      background: linear-gradient(135deg,#1a1f3a,#1e2442);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 12px; padding: 12px 8px;
+      text-align: center; cursor: pointer; transition: all .2s;
+    }
+    .prod-card-pos:hover {
+      border-color: rgba(0,191,255,.4); transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0,191,255,.15);
+    }
+    .carrito-item-pos {
+      background: rgba(255,255,255,.04); border-radius: 8px; padding: 8px 10px;
+      margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;
+    }
+    .ci-btn-pos {
+      background: rgba(0,191,255,.15); border: 1px solid rgba(0,191,255,.3);
+      color: #00bfff; width: 22px; height: 22px; border-radius: 5px; cursor: pointer;
+      font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center;
+    }
+    #productosGrid::-webkit-scrollbar { width: 3px; }
+    #productosGrid::-webkit-scrollbar-thumb { background: rgba(0,191,255,.3); border-radius: 2px; }
+    #carritoItems::-webkit-scrollbar { width: 3px; }
+    #carritoItems::-webkit-scrollbar-thumb { background: rgba(0,191,255,.3); border-radius: 2px; }
+    #categoriasPos::-webkit-scrollbar { display: none; }
 
-// ==================== REPORTES ====================
+    /* METODO PAGO TABS */
+    .pago-tab {
+      flex: 1; padding: 8px; border: 1px solid rgba(255,255,255,.1);
+      background: rgba(255,255,255,.04); color: #a0aec0;
+      border-radius: 8px; cursor: pointer; font-size: 0.78rem;
+      text-align: center; transition: all .2s;
+    }
+    .pago-tab.active {
+      background: rgba(0,191,255,.15); border-color: rgba(0,191,255,.4); color: #00e5ff;
+    }
 
-async function generarReporteDiario() {
-  try {
-    const { jsPDF } = window.jspdf
-    const doc = new jsPDF()
-    const hoy = new Date().toLocaleDateString("es-CO")
+    /* MODAL COBRO */
+    .modal-cobro {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.85); z-index: 2000;
+      align-items: center; justify-content: center; padding: 20px;
+    }
+    .modal-cobro.show { display: flex; }
+    .cobro-box {
+      background: linear-gradient(135deg,#1a1f3a,#1e2442);
+      border: 1px solid rgba(0,191,255,.25);
+      border-radius: 18px; width: 100%; max-width: 460px;
+      padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,.7);
+    }
+  </style>
+</head>
+<body>
 
-    doc.setFontSize(16)
-    doc.text("Reporte de Ventas - Diario", 20, 20)
-    doc.setFontSize(10)
-    doc.text(`Fecha: ${hoy}`, 20, 30)
+  <div class="mesas-header">
+    <div>
+      <h1>🪑 Mapa de Mesas — Ice Vibe</h1>
+      <p id="subtitulo">Cargando...</p>
+    </div>
+    <div class="header-actions">
+      <button class="refresh-btn" onclick="cargarMesas()">🔄 Actualizar</button>
+      <a id="btnVolver" href="#" class="btn-back">← Volver</a>
+    </div>
+  </div>
 
-    const ventasHoy = ventas.filter((v) => v.fechaVenta && v.fechaVenta.startsWith(hoy.split("/").reverse().join("-")))
-    const totalHoy = ventasHoy.reduce((sum, v) => sum + Number.parseFloat(v.total || 0), 0)
+  <div class="stat-bar">
+    <span>Mesas libres: <strong id="statLibres">-</strong></span>
+    <span>Mesas ocupadas: <strong id="statOcupadas">-</strong></span>
+    <span>Total consumiendo: <strong id="statTotal">-</strong></span>
+  </div>
 
-    let y = 45
-    doc.text("Resumen:", 20, y)
-    y += 10
-    doc.text(`Total de ventas: ${ventasHoy.length}`, 20, y)
-    y += 5
-    doc.text(`Total ingresos: ${formatearMoneda(totalHoy)}`, 20, y)
+  <div class="leyenda">
+    <div class="leyenda-item"><div class="leyenda-dot dot-libre"></div> Libre</div>
+    <div class="leyenda-item"><div class="leyenda-dot dot-ocupada"></div> Ocupada</div>
+  </div>
 
-    if (ventasHoy.length > 0) {
-      y += 15
-      doc.text("Detalle de ventas:", 20, y)
-      y += 10
+  <div class="mesas-container" id="mesasContainer">
+    <div class="loading">Cargando mesas...</div>
+  </div>
 
-      ventasHoy.forEach((venta, idx) => {
-        if (y > 270) {
-          doc.addPage()
-          y = 20
+  <!-- MODAL POS COMPLETO -->
+  <div class="modal-overlay" id="modalMesa">
+    <div style="background:linear-gradient(135deg,#0d1230,#0a0e27);border:1px solid rgba(0,191,255,.25);border-radius:18px;width:100%;max-width:1100px;margin:auto;box-shadow:0 20px 60px rgba(0,0,0,.7);">
+
+      <!-- Header -->
+      <div style="padding:18px 24px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;background:linear-gradient(135deg,#1a1f3a,#1e2442);border-radius:18px 18px 0 0;position:sticky;top:0;z-index:10;">
+        <div>
+          <h2 id="modalTitulo" style="font-size:1.1rem;color:#00e5ff;">Mesa</h2>
+          <div id="modalMeta" style="font-size:0.78rem;color:#a0aec0;margin-top:2px;"></div>
+        </div>
+        <button style="background:none;border:none;color:#a0aec0;font-size:1.4rem;cursor:pointer;" onclick="cerrarModal()">✕</button>
+      </div>
+
+      <!-- Layout -->
+      <div style="display:grid;grid-template-columns:1fr 340px;min-height:580px;">
+
+        <!-- Panel productos -->
+        <div style="padding:20px;border-right:1px solid rgba(255,255,255,.06);">
+          <div id="categoriasPos" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:10px;margin-bottom:14px;scrollbar-width:none;"></div>
+          <div id="productosGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;max-height:500px;overflow-y:auto;padding-right:4px;"></div>
+        </div>
+
+        <!-- Panel carrito -->
+        <div style="padding:20px;display:flex;flex-direction:column;background:rgba(0,0,0,.2);border-radius:0 0 18px 0;">
+          <div style="font-size:0.82rem;color:#a0aec0;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;font-weight:600;">🛒 Mesa <span id="carritoNumMesa">-</span></div>
+
+          <!-- Consumo previo -->
+          <div id="consumoPrevioBox" style="display:none;margin-bottom:8px;">
+            <div style="font-size:0.7rem;color:#a0aec0;text-transform:uppercase;margin-bottom:5px;">Ya consumido</div>
+            <div id="consumoPrevioItems"></div>
+            <div style="display:flex;justify-content:space-between;font-size:0.78rem;padding:5px 0;border-top:1px solid rgba(255,255,255,.06);margin-top:3px;">
+              <span style="color:#a0aec0;">Subtotal previo</span>
+              <span style="color:#10b981;" id="consumoPrevioTotal">$0</span>
+            </div>
+            <div style="border-bottom:1px solid rgba(255,255,255,.06);margin:6px 0;"></div>
+          </div>
+
+          <!-- Carrito items -->
+          <div id="carritoItems" style="flex:1;overflow-y:auto;max-height:220px;margin-bottom:8px;">
+            <div style="text-align:center;padding:20px;color:#a0aec0;font-size:0.82rem;">Selecciona productos</div>
+          </div>
+
+          <!-- DESCUENTO -->
+          <div style="background:rgba(255,255,255,.03);border-radius:10px;padding:10px;margin-bottom:8px;">
+            <div style="font-size:0.72rem;color:#a0aec0;text-transform:uppercase;margin-bottom:6px;">🏷️ Descuento</div>
+            <div style="display:flex;gap:6px;margin-bottom:6px;">
+              <button class="pago-tab active" id="btnDescPct" onclick="setTipoDescuento('pct')">%</button>
+              <button class="pago-tab" id="btnDescVal" onclick="setTipoDescuento('val')">$ Valor</button>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <input id="inputDescuento" type="number" min="0" placeholder="0"
+                style="flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#fff;padding:6px 10px;border-radius:8px;font-size:0.85rem;"
+                oninput="actualizarCarrito()">
+              <span id="labelDescuento" style="color:#a0aec0;font-size:0.8rem;">%</span>
+            </div>
+          </div>
+
+          <!-- DIVIDIR CUENTA -->
+          <div style="background:rgba(255,255,255,.03);border-radius:10px;padding:10px;margin-bottom:8px;">
+            <div style="font-size:0.72rem;color:#a0aec0;text-transform:uppercase;margin-bottom:6px;">👥 Dividir cuenta</div>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <button class="ci-btn-pos" onclick="cambiarPersonas(-1)">−</button>
+              <span id="numPersonas" style="flex:1;text-align:center;color:#fff;font-size:0.9rem;font-weight:600;">1 persona</span>
+              <button class="ci-btn-pos" onclick="cambiarPersonas(1)">+</button>
+            </div>
+            <div id="porPersonaBox" style="display:none;margin-top:6px;text-align:center;font-size:0.82rem;">
+              <span style="color:#a0aec0;">Cada uno paga: </span>
+              <span style="color:#00e5ff;font-weight:700;" id="porPersona">$0</span>
+            </div>
+          </div>
+
+          <!-- TOTALES -->
+          <div style="border-top:1px solid rgba(255,255,255,.08);padding-top:8px;margin-bottom:10px;">
+            <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:3px;">
+              <span style="color:#a0aec0;">Subtotal</span>
+              <span style="color:#fff;" id="posSubtotal">$0</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:3px;" id="descuentoRow" style="display:none;">
+              <span style="color:#f59e0b;">Descuento</span>
+              <span style="color:#f59e0b;" id="posDescuento">-$0</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:1rem;font-weight:700;margin-top:4px;">
+              <span style="color:#fff;">TOTAL</span>
+              <span style="color:#00e5ff;" id="posTotal">$0</span>
+            </div>
+          </div>
+
+          <!-- BOTONES -->
+          <button onclick="abrirModalCobro()"
+            style="width:100%;padding:12px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:10px;font-size:0.9rem;font-weight:700;cursor:pointer;margin-bottom:8px;">
+            💳 Cobrar
+          </button>
+          <button onclick="posEnviarWhatsApp()"
+            style="width:100%;padding:10px;background:linear-gradient(135deg,#075e54,#128c7e);color:#fff;border:none;border-radius:10px;font-size:0.85rem;font-weight:600;cursor:pointer;margin-bottom:8px;">
+            📱 Enviar WhatsApp
+          </button>
+          <button onclick="cerrarModal()"
+            style="width:100%;padding:10px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#ef4444;border-radius:10px;font-size:0.85rem;cursor:pointer;">
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL COBRO — método de pago -->
+  <div class="modal-cobro" id="modalCobro">
+    <div class="cobro-box">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <h2 style="color:#00e5ff;font-size:1.1rem;">💳 Cobrar Mesa <span id="cobroMesaNum">-</span></h2>
+        <button style="background:none;border:none;color:#a0aec0;font-size:1.3rem;cursor:pointer;" onclick="cerrarModalCobro()">✕</button>
+      </div>
+
+      <!-- Total a cobrar -->
+      <div style="background:rgba(0,191,255,.08);border:1px solid rgba(0,191,255,.2);border-radius:12px;padding:16px;text-align:center;margin-bottom:20px;">
+        <div style="font-size:0.78rem;color:#a0aec0;margin-bottom:4px;">TOTAL A COBRAR</div>
+        <div style="font-size:1.8rem;font-weight:700;color:#00e5ff;" id="cobroTotal">$0</div>
+        <div id="cobroDividido" style="display:none;font-size:0.8rem;color:#a0aec0;margin-top:4px;"></div>
+      </div>
+
+      <!-- Método de pago -->
+      <div style="margin-bottom:16px;">
+        <div style="font-size:0.75rem;color:#a0aec0;text-transform:uppercase;margin-bottom:8px;">Método de pago</div>
+        <div style="display:flex;gap:8px;">
+          <button class="pago-tab active" id="tabEfectivo" onclick="setMetodoPago('efectivo')">💵 Efectivo</button>
+          <button class="pago-tab" id="tabTransferencia" onclick="setMetodoPago('transferencia')">📲 Transfer.</button>
+          <button class="pago-tab" id="tabTarjeta" onclick="setMetodoPago('tarjeta')">💳 Tarjeta</button>
+        </div>
+      </div>
+
+      <!-- Monto recibido (solo efectivo) -->
+      <div id="efectivoBox" style="margin-bottom:16px;">
+        <div style="font-size:0.75rem;color:#a0aec0;text-transform:uppercase;margin-bottom:6px;">Monto recibido</div>
+        <input id="montoRecibido" type="number" placeholder="Ingresa el monto"
+          style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#fff;padding:10px 14px;border-radius:10px;font-size:1rem;"
+          oninput="calcularVuelto()">
+        <div id="vueltoBox" style="display:none;margin-top:10px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.2);border-radius:10px;padding:12px;text-align:center;">
+          <div style="font-size:0.78rem;color:#a0aec0;margin-bottom:2px;">VUELTO</div>
+          <div style="font-size:1.4rem;font-weight:700;color:#10b981;" id="vueltoMonto">$0</div>
+        </div>
+      </div>
+
+      <!-- Botón confirmar -->
+      <button onclick="confirmarCobro()"
+        style="width:100%;padding:14px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;">
+        ✅ Confirmar pago y liberar mesa
+      </button>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script>
+const session = JSON.parse(sessionStorage.getItem('tabSession') || localStorage.getItem('session') || 'null')
+    if (!session) window.location.href = 'index.html'
+
+    const esAdmin  = session?.rol === 'ADMIN'
+    const esMesero = session?.rol === 'VENDEDOR'
+    document.getElementById('btnVolver').href = esAdmin ? 'dashboard-admin.html' : 'pos-mesero.html'
+
+    let mesaActual      = null
+    let todosProductos  = []
+    let carrito         = []
+    let categoriaActual = 'TODAS'
+    let consumoPrevio   = []
+    let totalPrevio     = 0
+    let tipoDescuento   = 'pct'   // 'pct' o 'val'
+    let numPersonas     = 1
+    let metodoPago      = 'efectivo'
+
+    // ===== UTILS =====
+    function fmt(val) {
+      return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val || 0)
+    }
+    function fmtHora(iso) {
+      if (!iso) return 'N/A'
+      return new Date(iso).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+    }
+    function icono(nombre) {
+      if (!nombre) return '🥤'
+      const n = nombre.toLowerCase()
+      if (n.includes('cerveza') || n.includes('club') || n.includes('águila') || n.includes('aguila') ||
+          n.includes('poker') || n.includes('corona') || n.includes('budwei') || n.includes('bretaña') ||
+          n.includes('four') || n.includes('smirnoff')) return '🍺'
+      if (n.includes('shot') || n.includes('tequila') || n.includes('vodka') || n.includes('ron') ||
+          n.includes('aguardiente') || n.includes('jagger')) return '🥃'
+      if (n.includes('granizado') || n.includes('cremoso') || n.includes('ice') || n.includes('vibe') ||
+          n.includes('soda') || n.includes('michelada') || n.includes('coctelada')) return '🧊'
+      if (n.includes('perla') || n.includes('fruta') || n.includes('endulza')) return '🍬'
+      return '🥤'
+    }
+
+    function calcularDescuento(subtotal) {
+      const val = parseFloat(document.getElementById('inputDescuento').value) || 0
+      if (tipoDescuento === 'pct') return subtotal * (val / 100)
+      return Math.min(val, subtotal)
+    }
+
+    function calcularTotalFinal() {
+      const subtotalNuevo = carrito.reduce((s, i) => s + i.producto.precio * i.cantidad, 0)
+      const subtotalTotal = totalPrevio + subtotalNuevo
+      const descuento = calcularDescuento(subtotalTotal)
+      return Math.max(0, subtotalTotal - descuento)
+    }
+
+    // ===== DESCUENTO =====
+    function setTipoDescuento(tipo) {
+      tipoDescuento = tipo
+      document.getElementById('btnDescPct').classList.toggle('active', tipo === 'pct')
+      document.getElementById('btnDescVal').classList.toggle('active', tipo === 'val')
+      document.getElementById('labelDescuento').textContent = tipo === 'pct' ? '%' : '$'
+      document.getElementById('inputDescuento').value = ''
+      actualizarCarrito()
+    }
+
+    // ===== DIVIDIR CUENTA =====
+    function cambiarPersonas(delta) {
+      numPersonas = Math.max(1, numPersonas + delta)
+      document.getElementById('numPersonas').textContent = `${numPersonas} persona${numPersonas > 1 ? 's' : ''}`
+      const porPersonaBox = document.getElementById('porPersonaBox')
+      if (numPersonas > 1) {
+        porPersonaBox.style.display = 'block'
+        document.getElementById('porPersona').textContent = fmt(calcularTotalFinal() / numPersonas)
+      } else {
+        porPersonaBox.style.display = 'none'
+      }
+      actualizarCarrito()
+    }
+
+    // ===== MESAS =====
+    async function cargarMesas() {
+      try {
+        const mesas = await window.apiRequest('/mesas')
+        if (!Array.isArray(mesas) || mesas.length === 0) {
+          await window.apiRequest('/mesas/inicializar', { method: 'POST' })
+          return cargarMesas()
         }
-        doc.setFontSize(9)
-        doc.text(`${idx + 1}. ${venta.numeroVenta || venta.id} - ${formatearMoneda(venta.total)}`, 20, y)
-        y += 5
-      })
+        renderMesas(mesas)
+      } catch (e) {
+        document.getElementById('mesasContainer').innerHTML = '<div class="loading">❌ Error cargando mesas.</div>'
+      }
     }
 
-    doc.save(`reporte_diario_${new Date().toISOString().split("T")[0]}.pdf`)
-    alert("Reporte diario descargado")
-  } catch (error) {
-    console.error("Error al generar reporte:", error)
-    alert("Error al generar reporte: " + error.message)
-  }
-}
+    function renderMesas(mesas) {
+      const libres   = mesas.filter(m => m.estado === 'LIBRE').length
+      const ocupadas = mesas.filter(m => m.estado === 'OCUPADA').length
+      const totalC   = mesas.filter(m => m.estado === 'OCUPADA').reduce((s, m) => s + parseFloat(m.totalConsumido || 0), 0)
+      document.getElementById('statLibres').textContent   = libres
+      document.getElementById('statOcupadas').textContent = ocupadas
+      document.getElementById('statTotal').textContent    = fmt(totalC)
+      document.getElementById('subtitulo').textContent    = `${ocupadas} mesas ocupadas · ${libres} libres`
+      document.getElementById('mesasContainer').innerHTML = mesas.map(m => `
+        <div class="mesa-card ${m.estado.toLowerCase()}" onclick="abrirMesa(${m.numero})">
+          <div class="mesa-numero">${m.numero}</div>
+          <div class="mesa-label">Mesa</div>
+          <div class="mesa-estado estado-${m.estado.toLowerCase()}">${m.estado}</div>
+          ${m.estado === 'OCUPADA' ? `
+            <div class="mesa-total">${fmt(m.totalConsumido)}</div>
+            <div class="mesa-mesero">👤 ${m.meseroNombre || '-'}</div>
+          ` : ''}
+        </div>
+      `).join('')
+    }
 
-async function generarReporteSemanal() {
-  try {
-    const { jsPDF } = window.jspdf
-    const doc = new jsPDF()
-    const hoy = new Date()
-    const hace7Dias = new Date(hoy.getTime() - 7 * 24 * 60 * 60 * 1000)
+    // ===== ABRIR MESA =====
+    async function abrirMesa(numero) {
+      try {
+        const data = await window.apiRequest(`/mesas/${numero}`)
+        if (!data.success) { alert('Error al cargar la mesa'); return }
 
-    doc.setFontSize(16)
-    doc.text("Reporte de Ventas - Semanal", 20, 20)
-    doc.setFontSize(10)
-    doc.text(`Período: ${hace7Dias.toLocaleDateString("es-CO")} - ${hoy.toLocaleDateString("es-CO")}`, 20, 30)
+        mesaActual    = data.mesa
+        carrito       = []
+        consumoPrevio = data.productos || []
+        totalPrevio   = parseFloat(data.totalConsumido || 0)
+        numPersonas   = 1
+        tipoDescuento = 'pct'
 
-    const ventasSemana = ventas.filter((v) => {
-      const fechaVenta = new Date(v.fechaVenta)
-      return fechaVenta >= hace7Dias && fechaVenta <= hoy
-    })
-    const totalSemana = ventasSemana.reduce((sum, v) => sum + Number.parseFloat(v.total || 0), 0)
+        document.getElementById('inputDescuento').value = ''
+        document.getElementById('numPersonas').textContent = '1 persona'
+        document.getElementById('porPersonaBox').style.display = 'none'
+        document.getElementById('btnDescPct').classList.add('active')
+        document.getElementById('btnDescVal').classList.remove('active')
+        document.getElementById('labelDescuento').textContent = '%'
 
-    let y = 45
-    doc.text("Resumen:", 20, y)
-    y += 10
-    doc.text(`Total de ventas: ${ventasSemana.length}`, 20, y)
-    y += 5
-    doc.text(`Total ingresos: ${formatearMoneda(totalSemana)}`, 20, y)
-    doc.text(`Promedio por venta: ${formatearMoneda(totalSemana / ventasSemana.length || 0)}`, 20, y + 5)
+        document.getElementById('modalTitulo').textContent    = `Mesa ${numero}`
+        document.getElementById('carritoNumMesa').textContent = numero
 
-    if (ventasSemana.length > 0) {
-      y += 20
-      doc.text("Detalle de ventas:", 20, y)
-      y += 10
+        const estado = mesaActual.estado === 'OCUPADA'
+          ? `<span style="color:#ef4444">● OCUPADA</span> · 👤 ${mesaActual.meseroNombre || '-'} · ⏰ ${fmtHora(mesaActual.horaApertura)}`
+          : `<span style="color:#10b981">● LIBRE</span> · Listo para tomar pedido`
+        document.getElementById('modalMeta').innerHTML = estado
 
-      ventasSemana.forEach((venta, idx) => {
-        if (y > 270) {
-          doc.addPage()
-          y = 20
+        if (mesaActual.estado === 'OCUPADA' && consumoPrevio.length > 0) {
+          document.getElementById('consumoPrevioBox').style.display = 'block'
+          document.getElementById('consumoPrevioItems').innerHTML = consumoPrevio.map(p => `
+            <div style="display:flex;justify-content:space-between;font-size:0.76rem;padding:3px 6px;background:rgba(255,255,255,.03);border-radius:5px;margin-bottom:3px;">
+              <span style="color:#a0aec0;">${p.productoNombre} ×${p.cantidad}</span>
+              <span style="color:#10b981;">${fmt(p.subtotal)}</span>
+            </div>
+          `).join('')
+          document.getElementById('consumoPrevioTotal').textContent = fmt(totalPrevio)
+        } else {
+          document.getElementById('consumoPrevioBox').style.display = 'none'
         }
-        doc.setFontSize(9)
-        doc.text(
-          `${idx + 1}. ${venta.numeroVenta || venta.id} - ${new Date(venta.fechaVenta).toLocaleDateString("es-CO")} - ${formatearMoneda(venta.total)}`,
-          20,
-          y,
-        )
-        y += 5
-      })
+
+        actualizarCarrito()
+        await cargarProductosPos()
+        document.getElementById('modalMesa').classList.add('show')
+
+      } catch(e) {
+        alert('Error al abrir mesa: ' + e.message)
+      }
     }
 
-    doc.save(`reporte_semanal_${new Date().toISOString().split("T")[0]}.pdf`)
-    alert("Reporte semanal descargado")
-  } catch (error) {
-    console.error("Error al generar reporte:", error)
-    alert("Error al generar reporte: " + error.message)
-  }
-}
+    function cerrarModal() {
+      document.getElementById('modalMesa').classList.remove('show')
+      mesaActual = null; carrito = []; consumoPrevio = []; totalPrevio = 0; numPersonas = 1
+    }
 
-async function generarReporteMensual() {
-  try {
-    const { jsPDF } = window.jspdf
-    const doc = new jsPDF()
-    const hoy = new Date()
-    const hace30Dias = new Date(hoy.getTime() - 30 * 24 * 60 * 60 * 1000)
+    // ===== PRODUCTOS =====
+    async function cargarProductosPos() {
+      try {
+        const res = await window.apiRequest('/productos/activos')
+        todosProductos = Array.isArray(res) ? res : res.data || []
+        renderCategoriasPos()
+        renderProductosPos()
+      } catch(e) {
+        document.getElementById('productosGrid').innerHTML =
+          '<p style="color:#ef4444;text-align:center;grid-column:1/-1">Error cargando productos</p>'
+      }
+    }
 
-    doc.setFontSize(16)
-    doc.text("Reporte de Ventas - Mensual", 20, 20)
-    doc.setFontSize(10)
-    doc.text(`Período: ${hace30Dias.toLocaleDateString("es-CO")} - ${hoy.toLocaleDateString("es-CO")}`, 20, 30)
+    function renderCategoriasPos() {
+      const cats = ['TODAS', ...new Set(todosProductos.map(p => p.categoria))]
+      document.getElementById('categoriasPos').innerHTML = cats.map(c => `
+        <button class="cat-btn-pos ${c === categoriaActual ? 'active' : ''}"
+          onclick="filtrarCatPos(this,'${c}')">${c}</button>
+      `).join('')
+    }
 
-    const ventasMes = ventas.filter((v) => {
-      const fechaVenta = new Date(v.fechaVenta)
-      return fechaVenta >= hace30Dias && fechaVenta <= hoy
-    })
-    const totalMes = ventasMes.reduce((sum, v) => sum + Number.parseFloat(v.total || 0), 0)
+    function filtrarCatPos(el, cat) {
+      categoriaActual = cat
+      document.querySelectorAll('.cat-btn-pos').forEach(b => b.classList.remove('active'))
+      el.classList.add('active')
+      renderProductosPos()
+    }
 
-    let y = 45
-    doc.text("Resumen:", 20, y)
-    y += 10
-    doc.text(`Total de ventas: ${ventasMes.length}`, 20, y)
-    y += 5
-    doc.text(`Total ingresos: ${formatearMoneda(totalMes)}`, 20, y)
-    doc.text(`Promedio por venta: ${formatearMoneda(totalMes / ventasMes.length || 0)}`, 20, y + 5)
+    function renderProductosPos() {
+      const grid = document.getElementById('productosGrid')
+      const filtrados = categoriaActual === 'TODAS'
+        ? todosProductos
+        : todosProductos.filter(p => p.categoria === categoriaActual)
+      if (filtrados.length === 0) {
+        grid.innerHTML = '<p style="color:#a0aec0;text-align:center;grid-column:1/-1">Sin productos</p>'
+        return
+      }
+      grid.innerHTML = filtrados.map(p => `
+        <div class="prod-card-pos" onclick="agregarAlCarrito(${p.id})">
+          <div style="font-size:1.6rem;margin-bottom:5px;">${icono(p.nombre)}</div>
+          <div style="font-size:0.75rem;color:#fff;font-weight:600;margin-bottom:3px;line-height:1.3;">${p.nombre}</div>
+          <div style="font-size:0.8rem;color:#00e5ff;font-weight:700;">${fmt(p.precio)}</div>
+          <div style="font-size:0.65rem;color:#10b981;margin-top:2px;">Stock: ${p.stock || 0}</div>
+        </div>
+      `).join('')
+    }
 
-    if (ventasMes.length > 0) {
-      y += 20
-      doc.text("Detalle de ventas:", 20, y)
-      y += 10
+    // ===== CARRITO =====
+    function agregarAlCarrito(productoId) {
+      const prod = todosProductos.find(p => p.id === productoId)
+      if (!prod) return
+      const existe = carrito.find(i => i.producto.id === productoId)
+      if (existe) existe.cantidad++
+      else carrito.push({ producto: prod, cantidad: 1 })
+      actualizarCarrito()
+    }
 
-      ventasMes.forEach((venta, idx) => {
-        if (y > 270) {
-          doc.addPage()
-          y = 20
+    function cambiarCantidadPos(index, delta) {
+      carrito[index].cantidad += delta
+      if (carrito[index].cantidad <= 0) carrito.splice(index, 1)
+      actualizarCarrito()
+    }
+
+    function actualizarCarrito() {
+      const container = document.getElementById('carritoItems')
+      if (carrito.length === 0) {
+        container.innerHTML = '<div style="text-align:center;padding:20px;color:#a0aec0;font-size:0.82rem;">Selecciona productos</div>'
+      } else {
+        container.innerHTML = carrito.map((item, i) => `
+          <div class="carrito-item-pos">
+            <div style="flex:1;">
+              <div style="font-size:0.78rem;color:#fff;font-weight:600;">${item.producto.nombre}</div>
+              <div style="font-size:0.73rem;color:#00e5ff;">${fmt(item.producto.precio * item.cantidad)}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <button class="ci-btn-pos" onclick="cambiarCantidadPos(${i},-1)">−</button>
+              <span style="font-size:0.82rem;color:#fff;min-width:16px;text-align:center;">${item.cantidad}</span>
+              <button class="ci-btn-pos" onclick="cambiarCantidadPos(${i},1)">+</button>
+            </div>
+          </div>
+        `).join('')
+      }
+
+      const subtotalNuevo  = carrito.reduce((s, i) => s + i.producto.precio * i.cantidad, 0)
+      const subtotalTotal  = totalPrevio + subtotalNuevo
+      const descuento      = calcularDescuento(subtotalTotal)
+      const totalFinal     = Math.max(0, subtotalTotal - descuento)
+
+      document.getElementById('posSubtotal').textContent = fmt(subtotalTotal)
+
+      const descRow = document.getElementById('descuentoRow')
+      if (descuento > 0) {
+        descRow.style.display = 'flex'
+        document.getElementById('posDescuento').textContent = '-' + fmt(descuento)
+      } else {
+        descRow.style.display = 'none'
+      }
+
+      document.getElementById('posTotal').textContent = fmt(totalFinal)
+
+      if (numPersonas > 1) {
+        document.getElementById('porPersona').textContent = fmt(totalFinal / numPersonas)
+      }
+    }
+
+    // ===== MODAL COBRO =====
+    function abrirModalCobro() {
+      const total = calcularTotalFinal()
+      document.getElementById('cobroMesaNum').textContent = mesaActual?.numero || '-'
+      document.getElementById('cobroTotal').textContent   = fmt(total)
+      document.getElementById('montoRecibido').value      = ''
+      document.getElementById('vueltoBox').style.display  = 'none'
+
+      if (numPersonas > 1) {
+        document.getElementById('cobroDividido').style.display = 'block'
+        document.getElementById('cobroDividido').textContent =
+          `${numPersonas} personas · ${fmt(total / numPersonas)} c/u`
+      } else {
+        document.getElementById('cobroDividido').style.display = 'none'
+      }
+
+      metodoPago = 'efectivo'
+      document.getElementById('tabEfectivo').classList.add('active')
+      document.getElementById('tabTransferencia').classList.remove('active')
+      document.getElementById('tabTarjeta').classList.remove('active')
+      document.getElementById('efectivoBox').style.display = 'block'
+
+      document.getElementById('modalCobro').classList.add('show')
+    }
+
+    function cerrarModalCobro() {
+      document.getElementById('modalCobro').classList.remove('show')
+    }
+
+    function setMetodoPago(metodo) {
+      metodoPago = metodo
+      document.getElementById('tabEfectivo').classList.toggle('active', metodo === 'efectivo')
+      document.getElementById('tabTransferencia').classList.toggle('active', metodo === 'transferencia')
+      document.getElementById('tabTarjeta').classList.toggle('active', metodo === 'tarjeta')
+      document.getElementById('efectivoBox').style.display = metodo === 'efectivo' ? 'block' : 'none'
+    }
+
+    function calcularVuelto() {
+      const total    = calcularTotalFinal()
+      const recibido = parseFloat(document.getElementById('montoRecibido').value) || 0
+      const vuelto   = recibido - total
+      const vueltoBox = document.getElementById('vueltoBox')
+      if (recibido > 0) {
+        vueltoBox.style.display = 'block'
+        document.getElementById('vueltoMonto').textContent = vuelto >= 0 ? fmt(vuelto) : '⚠️ Monto insuficiente'
+        document.getElementById('vueltoMonto').style.color = vuelto >= 0 ? '#10b981' : '#ef4444'
+      } else {
+        vueltoBox.style.display = 'none'
+      }
+    }
+
+    async function confirmarCobro() {
+      if (metodoPago === 'efectivo') {
+        const total    = calcularTotalFinal()
+        const recibido = parseFloat(document.getElementById('montoRecibido').value) || 0
+        if (recibido < total) {
+          alert('El monto recibido es menor al total')
+          return
         }
-        doc.setFontSize(9)
-        doc.text(
-          `${idx + 1}. ${venta.numeroVenta || venta.id} - ${new Date(venta.fechaVenta).toLocaleDateString("es-CO")} - ${formatearMoneda(venta.total)}`,
-          20,
-          y,
-        )
-        y += 5
-      })
+      }
+
+      try {
+        // Si hay productos nuevos en carrito, registrarlos primero
+        if (carrito.length > 0) {
+          await posRegistrarVentaSilenciosa()
+        } else if (mesaActual.estado === 'LIBRE' && carrito.length === 0) {
+          alert('Agrega productos antes de cobrar')
+          return
+        }
+
+        // Liberar mesa
+        const res = await window.apiRequest(`/mesas/${mesaActual.numero}/liberar`, { method: 'POST' })
+        if (!res.success) throw new Error(res.message)
+
+        const vuelto = metodoPago === 'efectivo'
+          ? parseFloat(document.getElementById('montoRecibido').value) - calcularTotalFinal()
+          : 0
+
+        cerrarModalCobro()
+        cerrarModal()
+        cargarMesas()
+
+        let msg = `✅ Mesa ${mesaActual?.numero || ''} cobrada\n`
+        msg += `Total: ${fmt(calcularTotalFinal() || totalPrevio)}\n`
+        msg += `Método: ${metodoPago.toUpperCase()}`
+        if (metodoPago === 'efectivo' && vuelto >= 0) msg += `\nVuelto: ${fmt(vuelto)}`
+        alert(msg)
+
+      } catch(e) {
+        alert('Error al cobrar: ' + e.message)
+      }
     }
 
-    doc.save(`reporte_mensual_${new Date().toISOString().split("T")[0]}.pdf`)
-    alert("Reporte mensual descargado")
-  } catch (error) {
-    console.error("Error al generar reporte:", error)
-    alert("Error al generar reporte: " + error.message)
-  }
-}
+    // ===== REGISTRAR VENTA SILENCIOSA (sin cerrar modal) =====
+    async function posRegistrarVentaSilenciosa() {
+      if (carrito.length === 0) return
 
-// ==================== UTILIDADES ====================
+      const subtotalNuevo = carrito.reduce((s, i) => s + i.producto.precio * i.cantidad, 0)
+      const descuento     = calcularDescuento(totalPrevio + subtotalNuevo)
+      const detalles      = carrito.map(i => ({
+        productoId: i.producto.id, cantidad: i.cantidad,
+        precioUnitario: i.producto.precio, subtotal: i.producto.precio * i.cantidad, notas: ''
+      }))
 
-function formatearMoneda(valor) {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    minimumFractionDigits: 0,
-  }).format(valor)
-}
-
-async function eliminarTodasLasVentas() {
-  // Triple confirmación para seguridad
-  const confirmacion1 = confirm("⚠️ ADVERTENCIA: Esto eliminará TODAS las ventas de prueba.\n\n¿Está seguro?")
-  if (!confirmacion1) return
-
-  const confirmacion2 = confirm("⚠️ Esta acción NO se puede deshacer.\n\n¿Está REALMENTE seguro?")
-  if (!confirmacion2) return
-
-  const inputUser = prompt("⚠️ Escriba 'LIMPIAR' para confirmar:")
-  if (inputUser !== "LIMPIAR") {
-    alert("Operación cancelada")
-    return
-  }
-
-  try {
-    console.log("[v0] Eliminando todas las ventas...")
-
-    // Eliminar cada venta
-    const ventasAEliminar = [...ventas]
-    for (const venta of ventasAEliminar) {
-      await window.apiRequest(`/ventas/${venta.id}`, {
-        method: "DELETE",
-      })
+      if (mesaActual.estado === 'OCUPADA' && mesaActual.ventaActivaId) {
+        const res = await window.apiRequest(`/mesas/${mesaActual.numero}/agregar-productos`, {
+          method: 'POST', body: JSON.stringify({ detalles })
+        })
+        if (!res.success) throw new Error(res.message)
+      } else {
+        const res = await window.apiRequest('/ventas', {
+          method: 'POST',
+          body: JSON.stringify({
+            usuarioId: session.id,
+            subtotal: subtotalNuevo,
+            impuestos: 0,
+            descuento: descuento,
+            total: Math.max(0, subtotalNuevo - descuento),
+            numeroMesa: mesaActual.numero,
+            meseroNombre: session.nombre,
+            observaciones: `Mesa: ${mesaActual.numero} | ${session.nombre}`,
+            detalles
+          })
+        })
+        if (!res.success) throw new Error(res.message)
+      }
     }
 
-    alert("✅ Base de datos limpiada. Todas las ventas han sido eliminadas.")
+    // ===== REGISTRAR VENTA (botón WhatsApp) =====
+    async function posRegistrarVenta() {
+      if (carrito.length === 0 && mesaActual.estado === 'OCUPADA') {
+        abrirModalCobro()
+        return
+      }
+      if (carrito.length === 0) { alert('Selecciona al menos un producto'); return }
+      try {
+        await posRegistrarVentaSilenciosa()
+        alert(`✅ Productos guardados en Mesa ${mesaActual.numero}`)
+        cerrarModal()
+        cargarMesas()
+      } catch(e) { alert('Error: ' + e.message) }
+    }
 
-    // Recargar datos
-    await cargarVentas()
-    await cargarEstadisticas()
-  } catch (error) {
-    console.error("[v0] Error al limpiar BD:", error)
-    alert("Error al limpiar la base de datos: " + error.message)
-  }
-}
+    // ===== WHATSAPP =====
+    async function posEnviarWhatsApp() {
+      if (carrito.length === 0 && mesaActual.estado === 'LIBRE') {
+        alert('Agrega productos primero')
+        return
+      }
 
-function cerrarSesion() {
-  if (confirm("¿Está seguro de cerrar sesión?")) {
-    localStorage.removeItem("session")
-    window.location.href = "index.html"
-  }
-}
+      const subtotalNuevo = carrito.reduce((s, i) => s + i.producto.precio * i.cantidad, 0)
+      const subtotalTotal = totalPrevio + subtotalNuevo
+      const descuento     = calcularDescuento(subtotalTotal)
+      const totalFinal    = Math.max(0, subtotalTotal - descuento)
+
+      let msg = `🧊 *PEDIDO ICE VIBE* 🧊\n\n🪑 Mesa: ${mesaActual.numero}\n👨‍💼 ${session.nombre}\n\n`
+
+      if (consumoPrevio.length > 0) {
+        msg += `*YA CONSUMIDO:*\n`
+        consumoPrevio.forEach(p => { msg += `• ${p.productoNombre} ×${p.cantidad} = ${fmt(p.subtotal)}\n` })
+        msg += `\n`
+      }
+
+      if (carrito.length > 0) {
+        msg += `*NUEVOS PRODUCTOS:*\n`
+        carrito.forEach(i => { msg += `• ${i.producto.nombre} ×${i.cantidad} = ${fmt(i.producto.precio * i.cantidad)}\n` })
+        msg += `\n`
+      }
+
+      if (descuento > 0) msg += `🏷️ Descuento: -${fmt(descuento)}\n`
+      if (numPersonas > 1) msg += `👥 Por persona (${numPersonas}): ${fmt(totalFinal / numPersonas)}\n`
+
+      msg += `\n━━━━━━━━━━━━━━━━\n💰 *TOTAL: ${fmt(totalFinal)}*\n\n¡Gracias! 🎉`
+
+      const tel = window.API_CONFIG.WHATSAPP_NUMBER.replace(/\D/g, '')
+      window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, '_blank')
+
+      // Guardar en BD
+      if (carrito.length > 0) await posRegistrarVentaSilenciosa()
+    }
+
+    // ===== COBRAR MESA =====
+    async function cobrarMesa(numero) {
+      abrirModalCobro()
+    }
+
+    cargarMesas()
+    setInterval(cargarMesas, 30000)
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') { cerrarModalCobro(); cerrarModal() } })
+  </script>
+</body>
+</html>
