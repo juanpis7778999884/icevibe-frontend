@@ -1,6 +1,6 @@
 // Get session from localStorage (set by auth.js)
 function getSession() {
-  const sessionData = localStorage.getItem("session")
+ const sessionData = sessionStorage.getItem("session")
   if (!sessionData) {
     console.error("[v0] No session found")
     window.location.href = "index.html"
@@ -735,7 +735,7 @@ async function eliminarTodasLasVentas() {
 
 function cerrarSesion() {
   if (confirm("¿Está seguro de cerrar sesión?")) {
-    localStorage.removeItem("session")
+    sessionStorage.removeItem("session")
     window.location.href = "index.html"
   }
 }
