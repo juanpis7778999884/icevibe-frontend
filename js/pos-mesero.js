@@ -478,8 +478,9 @@ function cerrarModalHistorialMesas() {
 
 async function cargarHistorial() {
   try {
-    const response = await window.apiRequest("/ventas")
-    historialVentas = Array.isArray(response) ? response : response.data || []
+    // Leer estado real de las mesas en vez de las ventas
+    const response = await window.apiRequest("/mesas")
+    historialVentas = Array.isArray(response) ? response : []
     mostrarHistorialMesas()
   } catch (error) {
     console.error("[v0] Error al cargar historial:", error)
@@ -491,56 +492,48 @@ async function cargarHistorial() {
   }
 }
 
+
 function mostrarHistorialMesas() {
   const container = document.getElementById("mesasContainer")
   if (!container) return
 
-  const mesasMap = {}
-  historialVentas.forEach((venta) => {
-    const numeroMesa = venta.numeroMesa || venta.numero_mesa || "N/A"
-    if (!mesasMap[numeroMesa]) {
-      mesasMap[numeroMesa] = venta
-    } else {
-      if (new Date(venta.fechaVenta) > new Date(mesasMap[numeroMesa].fechaVenta)) {
-        mesasMap[numeroMesa] = venta
-      }
-    }
-  })
+  // Solo mostrar mesas OCUPADAS
+  const mesasOcupadas = historialVentas.filter(m => m.estado === 'OCUPADA')
 
-  const mesas = Object.entries(mesasMap)
-    .map(([numeroMesa, venta]) => ({ numeroMesa, venta }))
-    .sort((a, b) => new Date(b.venta.fechaVenta) - new Date(a.venta.fechaVenta))
-
-  if (mesas.length === 0) {
+  if (mesasOcupadas.length === 0) {
     container.innerHTML =
-      '<p style="color: var(--text-gray); text-align: center; padding: 40px;">No hay mesas activas</p>'
+      '<p style="color: var(--text-gray); text-align: center; padding: 40px;">No hay mesas activas en este momento</p>'
     return
   }
 
-  container.innerHTML = mesas
-    .map(({ numeroMesa, venta }) => {
-      const fecha = new Date(venta.fechaVenta)
-      const horaFormato = fecha.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })
-      const tiempoTranscurrido = Math.floor((Date.now() - fecha.getTime()) / 1000 / 60)
+  container.innerHTML = mesasOcupadas
+    .sort((a, b) => a.numero - b.numero)
+    .map(mesa => {
+      const horaFormato = mesa.horaApertura
+        ? new Date(mesa.horaApertura).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })
+        : "N/A"
+      const tiempoTranscurrido = mesa.horaApertura
+        ? Math.floor((Date.now() - new Date(mesa.horaApertura).getTime()) / 1000 / 60)
+        : 0
       const tiempoTexto = tiempoTranscurrido < 1 ? "Hace poco" : `Hace ${tiempoTranscurrido}m`
 
       return `
         <div class="historial-item">
           <div class="historial-header">
             <div>
-              <strong style="font-size: 1.3em; color: #00ffff;">🪑 MESA ${numeroMesa}</strong>
+              <strong style="font-size: 1.3em; color: #00ffff;">🪑 MESA ${mesa.numero}</strong>
               <span class="historial-date">${tiempoTexto}</span>
             </div>
-            <span class="historial-total">${formatearMoneda(venta.total)}</span>
+            <span class="historial-total">${formatearMoneda(mesa.totalConsumido)}</span>
           </div>
           <div class="historial-details">
-            <p><strong>Atendido por:</strong> ${venta.vendedor || session.nombre || "N/A"}</p>
-            <p><strong>Hora:</strong> ${horaFormato}</p>
-            <p><strong>Estado:</strong> <span class="badge badge-success">ACTIVA</span></p>
+            <p><strong>Atendido por:</strong> ${mesa.meseroNombre || "N/A"}</p>
+            <p><strong>Hora apertura:</strong> ${horaFormato}</p>
+            <p><strong>Estado:</strong> <span class="badge badge-success">OCUPADA</span></p>
           </div>
           <div style="display: flex; gap: 8px; margin-top: 10px;">
-            <button class="btn-view-details" onclick="verDetallesVentaMesa(${venta.id})" style="flex: 1;">Ver Detalles</button>
-            <button class="btn-view-details" style="background-color: #ff3366; flex: 1;" onclick="marcarMesaComoPaga('${numeroMesa}', ${venta.id})">Mesa Pagó</button>
+            <button class="btn-view-details" onclick="verDetallesVentaMesa(${mesa.ventaActivaId})" style="flex: 1;">Ver Detalles</button>
+            <button class="btn-view-details" style="background-color: #ff3366; flex: 1;" onclick="marcarMesaComoPaga(${mesa.numero}, ${mesa.ventaActivaId})">Mesa Pagó</button>
           </div>
         </div>
       `
@@ -781,9 +774,55 @@ async function enviarPedidoWhatsApp() {
 function filtrarMesas(filtro) {
   document.querySelectorAll(".btn-filter").forEach((btn) => btn.classList.remove("active"))
   event.target.classList.add("active")
-  if (filtro === "TODAS" || filtro === "ACTIVAS") {
-    mostrarHistorialMesas()
+
+  const container = document.getElementById("mesasContainer")
+  if (!container) return
+
+  let filtradas = historialVentas
+  if (filtro === "ACTIVAS") {
+    filtradas = historialVentas.filter(m => m.estado === 'OCUPADA')
   }
+
+  if (filtradas.length === 0) {
+    container.innerHTML = '<p style="color: var(--text-gray); text-align: center; padding: 40px;">No hay mesas en este estado</p>'
+    return
+  }
+
+  container.innerHTML = filtradas
+    .sort((a, b) => a.numero - b.numero)
+    .map(mesa => {
+      const horaFormato = mesa.horaApertura
+        ? new Date(mesa.horaApertura).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })
+        : "N/A"
+      const tiempoTranscurrido = mesa.horaApertura
+        ? Math.floor((Date.now() - new Date(mesa.horaApertura).getTime()) / 1000 / 60)
+        : 0
+      const tiempoTexto = tiempoTranscurrido < 1 ? "Hace poco" : `Hace ${tiempoTranscurrido}m`
+      const esOcupada = mesa.estado === 'OCUPADA'
+
+      return `
+        <div class="historial-item">
+          <div class="historial-header">
+            <div>
+              <strong style="font-size: 1.3em; color: #00ffff;">🪑 MESA ${mesa.numero}</strong>
+              <span class="historial-date">${tiempoTexto}</span>
+            </div>
+            <span class="historial-total">${formatearMoneda(mesa.totalConsumido || 0)}</span>
+          </div>
+          <div class="historial-details">
+            <p><strong>Mesero:</strong> ${mesa.meseroNombre || "—"}</p>
+            <p><strong>Hora:</strong> ${horaFormato}</p>
+            <p><strong>Estado:</strong> <span class="badge ${esOcupada ? 'badge-danger' : 'badge-success'}">${mesa.estado}</span></p>
+          </div>
+          ${esOcupada ? `
+          <div style="display: flex; gap: 8px; margin-top: 10px;">
+            <button class="btn-view-details" onclick="verDetallesVentaMesa(${mesa.ventaActivaId})" style="flex: 1;">Ver Detalles</button>
+            <button class="btn-view-details" style="background-color: #ff3366; flex: 1;" onclick="marcarMesaComoPaga(${mesa.numero}, ${mesa.ventaActivaId})">Mesa Pagó</button>
+          </div>` : ''}
+        </div>
+      `
+    })
+    .join("")
 }
 
 function logout() {
