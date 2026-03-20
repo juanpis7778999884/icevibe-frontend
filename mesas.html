@@ -305,6 +305,30 @@
         <button style="background:none;border:none;color:#a0aec0;font-size:1.3rem;cursor:pointer;" onclick="cerrarModalCobro()">✕</button>
       </div>
 
+      <!-- MODAL TICKET -->
+<div id="modalTicket" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:3000;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:12px;width:100%;max-width:340px;box-shadow:0 20px 60px rgba(0,0,0,.7);overflow:hidden;">
+    
+    <!-- Acciones -->
+    <div style="background:#1a1f3a;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
+      <span style="color:#00e5ff;font-size:0.85rem;font-weight:600;">🧾 Ticket generado</span>
+      <div style="display:flex;gap:8px;">
+        <button onclick="imprimirTicket()"
+          style="background:rgba(0,191,255,.2);border:1px solid rgba(0,191,255,.3);color:#00bfff;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:0.78rem;">
+          🖨️ Imprimir
+        </button>
+        <button onclick="cerrarTicket()"
+          style="background:none;border:none;color:#a0aec0;font-size:1.2rem;cursor:pointer;">✕</button>
+      </div>
+    </div>
+
+    <!-- Contenido del ticket -->
+    <div id="ticketContenido" style="padding:20px;font-family:'Courier New',monospace;color:#111;">
+      <!-- Se genera dinámicamente -->
+    </div>
+  </div>
+</div>
+
       <!-- Total a cobrar -->
       <div style="background:rgba(0,191,255,.08);border:1px solid rgba(0,191,255,.2);border-radius:12px;padding:16px;text-align:center;margin-bottom:20px;">
         <div style="font-size:0.78rem;color:#a0aec0;margin-bottom:4px;">TOTAL A COBRAR</div>
@@ -666,7 +690,7 @@ const session = JSON.parse(sessionStorage.getItem('tabSession') || localStorage.
       }
     }
 
-    async function confirmarCobro() {
+async function confirmarCobro() {
       if (metodoPago === 'efectivo') {
         const total    = calcularTotalFinal()
         const recibido = parseFloat(document.getElementById('montoRecibido').value) || 0
@@ -675,6 +699,153 @@ const session = JSON.parse(sessionStorage.getItem('tabSession') || localStorage.
           return
         }
       }
+
+      try {
+        const totalFinal = calcularTotalFinal()
+        const vuelto = metodoPago === 'efectivo'
+          ? parseFloat(document.getElementById('montoRecibido').value) - totalFinal
+          : 0
+        const recibido = metodoPago === 'efectivo'
+          ? parseFloat(document.getElementById('montoRecibido').value)
+          : totalFinal
+
+        // Si hay productos nuevos en carrito, registrarlos primero
+        if (carrito.length > 0) {
+          await posRegistrarVentaSilenciosa()
+        } else if (mesaActual.estado === 'LIBRE' && carrito.length === 0) {
+          alert('Agrega productos antes de cobrar')
+          return
+        }
+
+        // Liberar mesa
+        const res = await window.apiRequest(`/mesas/${mesaActual.numero}/liberar`, { method: 'POST' })
+        if (!res.success) throw new Error(res.message)
+
+        // Generar ticket
+        generarTicket({
+          mesa:       mesaActual.numero,
+          mesero:     mesaActual.meseroNombre || session.nombre,
+          productos:  consumoPrevio,
+          carrito:    carrito,
+          totalPrevio,
+          totalFinal,
+          metodoPago,
+          recibido,
+          vuelto,
+          numPersonas
+        })
+
+        cerrarModalCobro()
+        cerrarModal()
+        cargarMesas()
+
+      } catch(e) {
+        alert('Error al cobrar: ' + e.message)
+      }
+    }
+
+    function generarTicket({ mesa, mesero, productos, carrito, totalPrevio, totalFinal, metodoPago, recibido, vuelto, numPersonas }) {
+      const ahora = new Date().toLocaleString('es-CO')
+      const linea = '─'.repeat(32)
+
+      let items = []
+      // Productos previos
+      productos.forEach(p => {
+        items.push({ nombre: p.productoNombre, cantidad: p.cantidad, subtotal: p.subtotal })
+      })
+      // Productos nuevos del carrito
+      carrito.forEach(i => {
+        items.push({ nombre: i.producto.nombre, cantidad: i.cantidad, subtotal: i.producto.precio * i.cantidad })
+      })
+
+      const subtotal = items.reduce((s, i) => s + parseFloat(i.subtotal || 0), 0)
+      const descuento = subtotal - totalFinal > 0 ? subtotal - totalFinal : 0
+
+      const html = `
+        <div style="text-align:center;margin-bottom:12px;">
+          <div style="font-size:1.3rem;font-weight:700;">🧊 ICE VIBE</div>
+          <div style="font-size:0.75rem;color:#555;">Sistema de Punto de Venta</div>
+          <div style="font-size:0.72rem;color:#777;margin-top:4px;">${ahora}</div>
+        </div>
+
+        <div style="font-size:0.78rem;border-top:1px dashed #ccc;border-bottom:1px dashed #ccc;padding:8px 0;margin-bottom:10px;">
+          <div>Mesa: <strong>${mesa}</strong></div>
+          <div>Atendido por: <strong>${mesero}</strong></div>
+        </div>
+
+        <div style="font-size:0.78rem;margin-bottom:10px;">
+          ${items.map(i => `
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+              <span>${i.nombre} x${i.cantidad}</span>
+              <span>${fmt(i.subtotal)}</span>
+            </div>
+          `).join('')}
+        </div>
+
+        <div style="border-top:1px dashed #ccc;padding-top:8px;font-size:0.78rem;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+            <span>Subtotal</span><span>${fmt(subtotal)}</span>
+          </div>
+          ${descuento > 0 ? `
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px;color:#d97706;">
+            <span>Descuento</span><span>-${fmt(descuento)}</span>
+          </div>` : ''}
+          <div style="display:flex;justify-content:space-between;font-weight:700;font-size:1rem;margin-top:6px;padding-top:6px;border-top:1px dashed #ccc;">
+            <span>TOTAL</span><span>${fmt(totalFinal)}</span>
+          </div>
+          ${numPersonas > 1 ? `
+          <div style="display:flex;justify-content:space-between;color:#555;margin-top:3px;font-size:0.72rem;">
+            <span>Por persona (${numPersonas})</span><span>${fmt(totalFinal / numPersonas)}</span>
+          </div>` : ''}
+        </div>
+
+        <div style="border-top:1px dashed #ccc;padding-top:8px;margin-top:8px;font-size:0.78rem;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+            <span>Método de pago</span><span style="text-transform:uppercase;">${metodoPago}</span>
+          </div>
+          ${metodoPago === 'efectivo' ? `
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+            <span>Recibido</span><span>${fmt(recibido)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-weight:700;color:#059669;">
+            <span>Vuelto</span><span>${fmt(Math.max(0, vuelto))}</span>
+          </div>` : ''}
+        </div>
+
+        <div style="text-align:center;margin-top:16px;font-size:0.72rem;color:#777;border-top:1px dashed #ccc;padding-top:10px;">
+          ¡Gracias por tu visita!<br>🧊 Ice Vibe
+        </div>
+      `
+
+      document.getElementById('ticketContenido').innerHTML = html
+      document.getElementById('modalTicket').style.display = 'flex'
+    }
+
+    function cerrarTicket() {
+      document.getElementById('modalTicket').style.display = 'none'
+    }
+
+    function imprimirTicket() {
+      const contenido = document.getElementById('ticketContenido').innerHTML
+      const ventana = window.open('', '_blank', 'width=400,height=600')
+      ventana.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Ticket Ice Vibe</title>
+          <style>
+            body { font-family: 'Courier New', monospace; margin: 0; padding: 16px; font-size: 12px; }
+            @media print { body { margin: 0; } }
+          </style>
+        </head>
+        <body onload="window.print();window.close();">
+          ${contenido}
+        </body>
+        </html>
+      `)
+      ventana.document.close()
+    }
 
       try {
         // Si hay productos nuevos en carrito, registrarlos primero
@@ -706,7 +877,7 @@ const session = JSON.parse(sessionStorage.getItem('tabSession') || localStorage.
       } catch(e) {
         alert('Error al cobrar: ' + e.message)
       }
-    }
+    
 
     // ===== REGISTRAR VENTA SILENCIOSA (sin cerrar modal) =====
     async function posRegistrarVentaSilenciosa() {
