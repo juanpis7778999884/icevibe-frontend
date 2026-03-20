@@ -7,7 +7,6 @@
   <link rel="stylesheet" href="css/pos-styles.css" />
   <style>
     body { overflow: auto; }
-
     .mesas-header {
       background: linear-gradient(135deg, #1a1f3a 0%, #1e2442 100%);
       padding: 16px 24px;
@@ -22,7 +21,6 @@
     .mesas-header h1 { font-size: 1.3rem; color: #00e5ff; }
     .mesas-header p  { font-size: 0.8rem; color: #a0aec0; margin-top: 2px; }
     .header-actions  { display: flex; gap: 10px; align-items: center; }
-
     .btn-back {
       background: rgba(0,191,255,0.1);
       border: 1px solid rgba(0,191,255,0.3);
@@ -36,7 +34,6 @@
       display: inline-block;
     }
     .btn-back:hover { background: rgba(0,191,255,0.2); }
-
     .leyenda {
       display: flex;
       gap: 20px;
@@ -49,7 +46,6 @@
     .leyenda-dot  { width: 14px; height: 14px; border-radius: 50%; }
     .dot-libre    { background: #10b981; box-shadow: 0 0 8px rgba(16,185,129,.6); }
     .dot-ocupada  { background: #ef4444; box-shadow: 0 0 8px rgba(239,68,68,.6); }
-
     .mesas-container {
       padding: 24px;
       display: grid;
@@ -58,7 +54,6 @@
       max-width: 1200px;
       margin: 0 auto;
     }
-
     .mesa-card {
       background: linear-gradient(135deg, #1a1f3a 0%, #1e2442 100%);
       border-radius: 14px;
@@ -74,7 +69,6 @@
     .mesa-card.libre:hover { border-color: #10b981; box-shadow: 0 0 20px rgba(16,185,129,.35); }
     .mesa-card.ocupada { border-color: rgba(239,68,68,.5); box-shadow: 0 0 12px rgba(239,68,68,.2); }
     .mesa-card.ocupada:hover { border-color: #ef4444; box-shadow: 0 0 20px rgba(239,68,68,.4); }
-
     .mesa-numero { font-size: 1.8rem; font-weight: 700; color: #fff; line-height: 1; }
     .mesa-label  { font-size: 0.65rem; color: #a0aec0; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
     .mesa-estado { margin-top: 10px; font-size: 0.72rem; font-weight: 600; padding: 3px 10px; border-radius: 20px; display: inline-block; }
@@ -82,7 +76,6 @@
     .estado-ocupada { background: rgba(239,68,68,.15);  color: #ef4444; }
     .mesa-total  { margin-top: 6px; font-size: 0.75rem; color: #00e5ff; font-weight: 600; }
     .mesa-mesero { margin-top: 3px; font-size: 0.68rem; color: #a0aec0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
     .modal-overlay {
       display: none; position: fixed; inset: 0;
       background: rgba(0,0,0,.85); z-index: 1000;
@@ -90,21 +83,17 @@
       padding: 16px; overflow-y: auto;
     }
     .modal-overlay.show { display: flex; }
-
     .stat-bar { display: flex; gap: 20px; padding: 12px 24px; background: rgba(0,0,0,.2); font-size: 0.82rem; flex-wrap: wrap; }
     .stat-bar span   { color: #a0aec0; }
     .stat-bar strong { color: #00e5ff; }
-
     .refresh-btn {
       background: rgba(0,191,255,.1); border: 1px solid rgba(0,191,255,.3);
       color: #00bfff; padding: 8px 14px; border-radius: 8px; cursor: pointer;
       font-size: 0.82rem; transition: all .2s;
     }
     .refresh-btn:hover { background: rgba(0,191,255,.2); }
-
     .empty-state { text-align: center; padding: 20px; color: #a0aec0; font-size: 0.85rem; }
     .loading     { text-align: center; padding: 60px; color: #a0aec0; }
-
     .cat-btn-pos {
       background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1);
       color: #a0aec0; padding: 5px 12px; border-radius: 20px; cursor: pointer;
@@ -137,8 +126,6 @@
     #carritoItems::-webkit-scrollbar { width: 3px; }
     #carritoItems::-webkit-scrollbar-thumb { background: rgba(0,191,255,.3); border-radius: 2px; }
     #categoriasPos::-webkit-scrollbar { display: none; }
-
-    /* METODO PAGO TABS */
     .pago-tab {
       flex: 1; padding: 8px; border: 1px solid rgba(255,255,255,.1);
       background: rgba(255,255,255,.04); color: #a0aec0;
@@ -148,8 +135,6 @@
     .pago-tab.active {
       background: rgba(0,191,255,.15); border-color: rgba(0,191,255,.4); color: #00e5ff;
     }
-
-    /* MODAL COBRO */
     .modal-cobro {
       display: none; position: fixed; inset: 0;
       background: rgba(0,0,0,.85); z-index: 2000;
@@ -195,8 +180,6 @@
   <!-- MODAL POS COMPLETO -->
   <div class="modal-overlay" id="modalMesa">
     <div style="background:linear-gradient(135deg,#0d1230,#0a0e27);border:1px solid rgba(0,191,255,.25);border-radius:18px;width:100%;max-width:1100px;margin:auto;box-shadow:0 20px 60px rgba(0,0,0,.7);">
-
-      <!-- Header -->
       <div style="padding:18px 24px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;background:linear-gradient(135deg,#1a1f3a,#1e2442);border-radius:18px 18px 0 0;position:sticky;top:0;z-index:10;">
         <div>
           <h2 id="modalTitulo" style="font-size:1.1rem;color:#00e5ff;">Mesa</h2>
@@ -204,21 +187,13 @@
         </div>
         <button style="background:none;border:none;color:#a0aec0;font-size:1.4rem;cursor:pointer;" onclick="cerrarModal()">✕</button>
       </div>
-
-      <!-- Layout -->
       <div style="display:grid;grid-template-columns:1fr 340px;min-height:580px;">
-
-        <!-- Panel productos -->
         <div style="padding:20px;border-right:1px solid rgba(255,255,255,.06);">
           <div id="categoriasPos" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:10px;margin-bottom:14px;scrollbar-width:none;"></div>
           <div id="productosGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;max-height:500px;overflow-y:auto;padding-right:4px;"></div>
         </div>
-
-        <!-- Panel carrito -->
         <div style="padding:20px;display:flex;flex-direction:column;background:rgba(0,0,0,.2);border-radius:0 0 18px 0;">
           <div style="font-size:0.82rem;color:#a0aec0;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;font-weight:600;">🛒 Mesa <span id="carritoNumMesa">-</span></div>
-
-          <!-- Consumo previo -->
           <div id="consumoPrevioBox" style="display:none;margin-bottom:8px;">
             <div style="font-size:0.7rem;color:#a0aec0;text-transform:uppercase;margin-bottom:5px;">Ya consumido</div>
             <div id="consumoPrevioItems"></div>
@@ -228,12 +203,9 @@
             </div>
             <div style="border-bottom:1px solid rgba(255,255,255,.06);margin:6px 0;"></div>
           </div>
-
-          <!-- Carrito items -->
           <div id="carritoItems" style="flex:1;overflow-y:auto;max-height:220px;margin-bottom:8px;">
             <div style="text-align:center;padding:20px;color:#a0aec0;font-size:0.82rem;">Selecciona productos</div>
           </div>
-
           <!-- DESCUENTO -->
           <div style="background:rgba(255,255,255,.03);border-radius:10px;padding:10px;margin-bottom:8px;">
             <div style="font-size:0.72rem;color:#a0aec0;text-transform:uppercase;margin-bottom:6px;">🏷️ Descuento</div>
@@ -248,7 +220,6 @@
               <span id="labelDescuento" style="color:#a0aec0;font-size:0.8rem;">%</span>
             </div>
           </div>
-
           <!-- DIVIDIR CUENTA -->
           <div style="background:rgba(255,255,255,.03);border-radius:10px;padding:10px;margin-bottom:8px;">
             <div style="font-size:0.72rem;color:#a0aec0;text-transform:uppercase;margin-bottom:6px;">👥 Dividir cuenta</div>
@@ -262,14 +233,13 @@
               <span style="color:#00e5ff;font-weight:700;" id="porPersona">$0</span>
             </div>
           </div>
-
           <!-- TOTALES -->
           <div style="border-top:1px solid rgba(255,255,255,.08);padding-top:8px;margin-bottom:10px;">
             <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:3px;">
               <span style="color:#a0aec0;">Subtotal</span>
               <span style="color:#fff;" id="posSubtotal">$0</span>
             </div>
-            <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:3px;" id="descuentoRow" style="display:none;">
+            <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:3px;" id="descuentoRow">
               <span style="color:#f59e0b;">Descuento</span>
               <span style="color:#f59e0b;" id="posDescuento">-$0</span>
             </div>
@@ -278,7 +248,6 @@
               <span style="color:#00e5ff;" id="posTotal">$0</span>
             </div>
           </div>
-
           <!-- BOTONES -->
           <button onclick="abrirModalCobro()"
             style="width:100%;padding:12px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:10px;font-size:0.9rem;font-weight:700;cursor:pointer;margin-bottom:8px;">
@@ -297,46 +266,18 @@
     </div>
   </div>
 
-  <!-- MODAL COBRO — método de pago -->
+  <!-- MODAL COBRO -->
   <div class="modal-cobro" id="modalCobro">
     <div class="cobro-box">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
         <h2 style="color:#00e5ff;font-size:1.1rem;">💳 Cobrar Mesa <span id="cobroMesaNum">-</span></h2>
         <button style="background:none;border:none;color:#a0aec0;font-size:1.3rem;cursor:pointer;" onclick="cerrarModalCobro()">✕</button>
       </div>
-
-      <!-- MODAL TICKET -->
-<div id="modalTicket" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:3000;align-items:center;justify-content:center;padding:20px;">
-  <div style="background:#fff;border-radius:12px;width:100%;max-width:340px;box-shadow:0 20px 60px rgba(0,0,0,.7);overflow:hidden;">
-    
-    <!-- Acciones -->
-    <div style="background:#1a1f3a;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
-      <span style="color:#00e5ff;font-size:0.85rem;font-weight:600;">🧾 Ticket generado</span>
-      <div style="display:flex;gap:8px;">
-        <button onclick="imprimirTicket()"
-          style="background:rgba(0,191,255,.2);border:1px solid rgba(0,191,255,.3);color:#00bfff;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:0.78rem;">
-          🖨️ Imprimir
-        </button>
-        <button onclick="cerrarTicket()"
-          style="background:none;border:none;color:#a0aec0;font-size:1.2rem;cursor:pointer;">✕</button>
-      </div>
-    </div>
-
-    <!-- Contenido del ticket -->
-    <div id="ticketContenido" style="padding:20px;font-family:'Courier New',monospace;color:#111;">
-      <!-- Se genera dinámicamente -->
-    </div>
-  </div>
-</div>
-
-      <!-- Total a cobrar -->
       <div style="background:rgba(0,191,255,.08);border:1px solid rgba(0,191,255,.2);border-radius:12px;padding:16px;text-align:center;margin-bottom:20px;">
         <div style="font-size:0.78rem;color:#a0aec0;margin-bottom:4px;">TOTAL A COBRAR</div>
         <div style="font-size:1.8rem;font-weight:700;color:#00e5ff;" id="cobroTotal">$0</div>
         <div id="cobroDividido" style="display:none;font-size:0.8rem;color:#a0aec0;margin-top:4px;"></div>
       </div>
-
-      <!-- Método de pago -->
       <div style="margin-bottom:16px;">
         <div style="font-size:0.75rem;color:#a0aec0;text-transform:uppercase;margin-bottom:8px;">Método de pago</div>
         <div style="display:flex;gap:8px;">
@@ -345,8 +286,6 @@
           <button class="pago-tab" id="tabTarjeta" onclick="setMetodoPago('tarjeta')">💳 Tarjeta</button>
         </div>
       </div>
-
-      <!-- Monto recibido (solo efectivo) -->
       <div id="efectivoBox" style="margin-bottom:16px;">
         <div style="font-size:0.75rem;color:#a0aec0;text-transform:uppercase;margin-bottom:6px;">Monto recibido</div>
         <input id="montoRecibido" type="number" placeholder="Ingresa el monto"
@@ -357,8 +296,6 @@
           <div style="font-size:1.4rem;font-weight:700;color:#10b981;" id="vueltoMonto">$0</div>
         </div>
       </div>
-
-      <!-- Botón confirmar -->
       <button onclick="confirmarCobro()"
         style="width:100%;padding:14px;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;">
         ✅ Confirmar pago y liberar mesa
@@ -366,9 +303,28 @@
     </div>
   </div>
 
+  <!-- MODAL TICKET -->
+  <div id="modalTicket" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:3000;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:#fff;border-radius:12px;width:100%;max-width:340px;box-shadow:0 20px 60px rgba(0,0,0,.7);overflow:hidden;">
+      <div style="background:#1a1f3a;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="color:#00e5ff;font-size:0.85rem;font-weight:600;">🧾 Ticket generado</span>
+        <div style="display:flex;gap:8px;">
+          <button onclick="imprimirTicket()"
+            style="background:rgba(0,191,255,.2);border:1px solid rgba(0,191,255,.3);color:#00bfff;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:0.78rem;">
+            🖨️ Imprimir
+          </button>
+          <button onclick="cerrarTicket()"
+            style="background:none;border:none;color:#a0aec0;font-size:1.2rem;cursor:pointer;">✕</button>
+        </div>
+      </div>
+      <div id="ticketContenido" style="padding:20px;font-family:'Courier New',monospace;color:#111;max-height:70vh;overflow-y:auto;">
+      </div>
+    </div>
+  </div>
+
   <script src="js/config.js"></script>
   <script>
-const session = JSON.parse(sessionStorage.getItem('tabSession') || localStorage.getItem('session') || 'null')
+    const session = JSON.parse(sessionStorage.getItem('tabSession') || localStorage.getItem('session') || 'null')
     if (!session) window.location.href = 'index.html'
 
     const esAdmin  = session?.rol === 'ADMIN'
@@ -381,11 +337,10 @@ const session = JSON.parse(sessionStorage.getItem('tabSession') || localStorage.
     let categoriaActual = 'TODAS'
     let consumoPrevio   = []
     let totalPrevio     = 0
-    let tipoDescuento   = 'pct'   // 'pct' o 'val'
+    let tipoDescuento   = 'pct'
     let numPersonas     = 1
     let metodoPago      = 'efectivo'
 
-    // ===== UTILS =====
     function fmt(val) {
       return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val || 0)
     }
@@ -420,7 +375,6 @@ const session = JSON.parse(sessionStorage.getItem('tabSession') || localStorage.
       return Math.max(0, subtotalTotal - descuento)
     }
 
-    // ===== DESCUENTO =====
     function setTipoDescuento(tipo) {
       tipoDescuento = tipo
       document.getElementById('btnDescPct').classList.toggle('active', tipo === 'pct')
@@ -430,7 +384,6 @@ const session = JSON.parse(sessionStorage.getItem('tabSession') || localStorage.
       actualizarCarrito()
     }
 
-    // ===== DIVIDIR CUENTA =====
     function cambiarPersonas(delta) {
       numPersonas = Math.max(1, numPersonas + delta)
       document.getElementById('numPersonas').textContent = `${numPersonas} persona${numPersonas > 1 ? 's' : ''}`
@@ -444,7 +397,6 @@ const session = JSON.parse(sessionStorage.getItem('tabSession') || localStorage.
       actualizarCarrito()
     }
 
-    // ===== MESAS =====
     async function cargarMesas() {
       try {
         const mesas = await window.apiRequest('/mesas')
@@ -479,7 +431,6 @@ const session = JSON.parse(sessionStorage.getItem('tabSession') || localStorage.
       `).join('')
     }
 
-    // ===== ABRIR MESA =====
     async function abrirMesa(numero) {
       try {
         const data = await window.apiRequest(`/mesas/${numero}`)
@@ -498,7 +449,6 @@ const session = JSON.parse(sessionStorage.getItem('tabSession') || localStorage.
         document.getElementById('btnDescPct').classList.add('active')
         document.getElementById('btnDescVal').classList.remove('active')
         document.getElementById('labelDescuento').textContent = '%'
-
         document.getElementById('modalTitulo').textContent    = `Mesa ${numero}`
         document.getElementById('carritoNumMesa').textContent = numero
 
@@ -534,7 +484,6 @@ const session = JSON.parse(sessionStorage.getItem('tabSession') || localStorage.
       mesaActual = null; carrito = []; consumoPrevio = []; totalPrevio = 0; numPersonas = 1
     }
 
-    // ===== PRODUCTOS =====
     async function cargarProductosPos() {
       try {
         const res = await window.apiRequest('/productos/activos')
@@ -581,7 +530,6 @@ const session = JSON.parse(sessionStorage.getItem('tabSession') || localStorage.
       `).join('')
     }
 
-    // ===== CARRITO =====
     function agregarAlCarrito(productoId) {
       const prod = todosProductos.find(p => p.id === productoId)
       if (!prod) return
@@ -639,7 +587,6 @@ const session = JSON.parse(sessionStorage.getItem('tabSession') || localStorage.
       }
     }
 
-    // ===== MODAL COBRO =====
     function abrirModalCobro() {
       const total = calcularTotalFinal()
       document.getElementById('cobroMesaNum').textContent = mesaActual?.numero || '-'
@@ -660,7 +607,6 @@ const session = JSON.parse(sessionStorage.getItem('tabSession') || localStorage.
       document.getElementById('tabTransferencia').classList.remove('active')
       document.getElementById('tabTarjeta').classList.remove('active')
       document.getElementById('efectivoBox').style.display = 'block'
-
       document.getElementById('modalCobro').classList.add('show')
     }
 
@@ -690,7 +636,7 @@ const session = JSON.parse(sessionStorage.getItem('tabSession') || localStorage.
       }
     }
 
-async function confirmarCobro() {
+    async function confirmarCobro() {
       if (metodoPago === 'efectivo') {
         const total    = calcularTotalFinal()
         const recibido = parseFloat(document.getElementById('montoRecibido').value) || 0
@@ -702,14 +648,11 @@ async function confirmarCobro() {
 
       try {
         const totalFinal = calcularTotalFinal()
-        const vuelto = metodoPago === 'efectivo'
-          ? parseFloat(document.getElementById('montoRecibido').value) - totalFinal
-          : 0
         const recibido = metodoPago === 'efectivo'
           ? parseFloat(document.getElementById('montoRecibido').value)
           : totalFinal
+        const vuelto = metodoPago === 'efectivo' ? recibido - totalFinal : 0
 
-        // Si hay productos nuevos en carrito, registrarlos primero
         if (carrito.length > 0) {
           await posRegistrarVentaSilenciosa()
         } else if (mesaActual.estado === 'LIBRE' && carrito.length === 0) {
@@ -717,27 +660,31 @@ async function confirmarCobro() {
           return
         }
 
-        // Liberar mesa
         const res = await window.apiRequest(`/mesas/${mesaActual.numero}/liberar`, { method: 'POST' })
         if (!res.success) throw new Error(res.message)
 
-        // Generar ticket
+        const mesaNum    = mesaActual.numero
+        const meseroNom  = mesaActual.meseroNombre || session.nombre
+        const prodsPrev  = [...consumoPrevio]
+        const carritoAct = [...carrito]
+        const prevTotal  = totalPrevio
+
+        cerrarModalCobro()
+        cerrarModal()
+        cargarMesas()
+
         generarTicket({
-          mesa:       mesaActual.numero,
-          mesero:     mesaActual.meseroNombre || session.nombre,
-          productos:  consumoPrevio,
-          carrito:    carrito,
-          totalPrevio,
+          mesa: mesaNum,
+          mesero: meseroNom,
+          productos: prodsPrev,
+          carrito: carritoAct,
+          totalPrevio: prevTotal,
           totalFinal,
           metodoPago,
           recibido,
           vuelto,
           numPersonas
         })
-
-        cerrarModalCobro()
-        cerrarModal()
-        cargarMesas()
 
       } catch(e) {
         alert('Error al cobrar: ' + e.message)
@@ -746,19 +693,16 @@ async function confirmarCobro() {
 
     function generarTicket({ mesa, mesero, productos, carrito, totalPrevio, totalFinal, metodoPago, recibido, vuelto, numPersonas }) {
       const ahora = new Date().toLocaleString('es-CO')
-      const linea = '─'.repeat(32)
 
       let items = []
-      // Productos previos
       productos.forEach(p => {
-        items.push({ nombre: p.productoNombre, cantidad: p.cantidad, subtotal: p.subtotal })
+        items.push({ nombre: p.productoNombre, cantidad: p.cantidad, subtotal: parseFloat(p.subtotal || 0) })
       })
-      // Productos nuevos del carrito
       carrito.forEach(i => {
         items.push({ nombre: i.producto.nombre, cantidad: i.cantidad, subtotal: i.producto.precio * i.cantidad })
       })
 
-      const subtotal = items.reduce((s, i) => s + parseFloat(i.subtotal || 0), 0)
+      const subtotal  = items.reduce((s, i) => s + i.subtotal, 0)
       const descuento = subtotal - totalFinal > 0 ? subtotal - totalFinal : 0
 
       const html = `
@@ -767,12 +711,10 @@ async function confirmarCobro() {
           <div style="font-size:0.75rem;color:#555;">Sistema de Punto de Venta</div>
           <div style="font-size:0.72rem;color:#777;margin-top:4px;">${ahora}</div>
         </div>
-
         <div style="font-size:0.78rem;border-top:1px dashed #ccc;border-bottom:1px dashed #ccc;padding:8px 0;margin-bottom:10px;">
           <div>Mesa: <strong>${mesa}</strong></div>
           <div>Atendido por: <strong>${mesero}</strong></div>
         </div>
-
         <div style="font-size:0.78rem;margin-bottom:10px;">
           ${items.map(i => `
             <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
@@ -781,7 +723,6 @@ async function confirmarCobro() {
             </div>
           `).join('')}
         </div>
-
         <div style="border-top:1px dashed #ccc;padding-top:8px;font-size:0.78rem;">
           <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
             <span>Subtotal</span><span>${fmt(subtotal)}</span>
@@ -798,7 +739,6 @@ async function confirmarCobro() {
             <span>Por persona (${numPersonas})</span><span>${fmt(totalFinal / numPersonas)}</span>
           </div>` : ''}
         </div>
-
         <div style="border-top:1px dashed #ccc;padding-top:8px;margin-top:8px;font-size:0.78rem;">
           <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
             <span>Método de pago</span><span style="text-transform:uppercase;">${metodoPago}</span>
@@ -811,7 +751,6 @@ async function confirmarCobro() {
             <span>Vuelto</span><span>${fmt(Math.max(0, vuelto))}</span>
           </div>` : ''}
         </div>
-
         <div style="text-align:center;margin-top:16px;font-size:0.72rem;color:#777;border-top:1px dashed #ccc;padding-top:10px;">
           ¡Gracias por tu visita!<br>🧊 Ice Vibe
         </div>
@@ -847,42 +786,8 @@ async function confirmarCobro() {
       ventana.document.close()
     }
 
-      try {
-        // Si hay productos nuevos en carrito, registrarlos primero
-        if (carrito.length > 0) {
-          await posRegistrarVentaSilenciosa()
-        } else if (mesaActual.estado === 'LIBRE' && carrito.length === 0) {
-          alert('Agrega productos antes de cobrar')
-          return
-        }
-
-        // Liberar mesa
-        const res = await window.apiRequest(`/mesas/${mesaActual.numero}/liberar`, { method: 'POST' })
-        if (!res.success) throw new Error(res.message)
-
-        const vuelto = metodoPago === 'efectivo'
-          ? parseFloat(document.getElementById('montoRecibido').value) - calcularTotalFinal()
-          : 0
-
-        cerrarModalCobro()
-        cerrarModal()
-        cargarMesas()
-
-        let msg = `✅ Mesa ${mesaActual?.numero || ''} cobrada\n`
-        msg += `Total: ${fmt(calcularTotalFinal() || totalPrevio)}\n`
-        msg += `Método: ${metodoPago.toUpperCase()}`
-        if (metodoPago === 'efectivo' && vuelto >= 0) msg += `\nVuelto: ${fmt(vuelto)}`
-        alert(msg)
-
-      } catch(e) {
-        alert('Error al cobrar: ' + e.message)
-      }
-    
-
-    // ===== REGISTRAR VENTA SILENCIOSA (sin cerrar modal) =====
     async function posRegistrarVentaSilenciosa() {
       if (carrito.length === 0) return
-
       const subtotalNuevo = carrito.reduce((s, i) => s + i.producto.precio * i.cantidad, 0)
       const descuento     = calcularDescuento(totalPrevio + subtotalNuevo)
       const detalles      = carrito.map(i => ({
@@ -914,7 +819,6 @@ async function confirmarCobro() {
       }
     }
 
-    // ===== REGISTRAR VENTA (botón WhatsApp) =====
     async function posRegistrarVenta() {
       if (carrito.length === 0 && mesaActual.estado === 'OCUPADA') {
         abrirModalCobro()
@@ -929,7 +833,6 @@ async function confirmarCobro() {
       } catch(e) { alert('Error: ' + e.message) }
     }
 
-    // ===== WHATSAPP =====
     async function posEnviarWhatsApp() {
       if (carrito.length === 0 && mesaActual.estado === 'LIBRE') {
         alert('Agrega productos primero')
@@ -942,39 +845,34 @@ async function confirmarCobro() {
       const totalFinal    = Math.max(0, subtotalTotal - descuento)
 
       let msg = `🧊 *PEDIDO ICE VIBE* 🧊\n\n🪑 Mesa: ${mesaActual.numero}\n👨‍💼 ${session.nombre}\n\n`
-
       if (consumoPrevio.length > 0) {
         msg += `*YA CONSUMIDO:*\n`
         consumoPrevio.forEach(p => { msg += `• ${p.productoNombre} ×${p.cantidad} = ${fmt(p.subtotal)}\n` })
         msg += `\n`
       }
-
       if (carrito.length > 0) {
         msg += `*NUEVOS PRODUCTOS:*\n`
         carrito.forEach(i => { msg += `• ${i.producto.nombre} ×${i.cantidad} = ${fmt(i.producto.precio * i.cantidad)}\n` })
         msg += `\n`
       }
-
       if (descuento > 0) msg += `🏷️ Descuento: -${fmt(descuento)}\n`
       if (numPersonas > 1) msg += `👥 Por persona (${numPersonas}): ${fmt(totalFinal / numPersonas)}\n`
-
       msg += `\n━━━━━━━━━━━━━━━━\n💰 *TOTAL: ${fmt(totalFinal)}*\n\n¡Gracias! 🎉`
 
       const tel = window.API_CONFIG.WHATSAPP_NUMBER.replace(/\D/g, '')
       window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, '_blank')
-
-      // Guardar en BD
       if (carrito.length > 0) await posRegistrarVentaSilenciosa()
     }
 
-    // ===== COBRAR MESA =====
     async function cobrarMesa(numero) {
       abrirModalCobro()
     }
 
     cargarMesas()
     setInterval(cargarMesas, 30000)
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') { cerrarModalCobro(); cerrarModal() } })
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { cerrarModalCobro(); cerrarModal(); cerrarTicket() }
+    })
   </script>
 </body>
 </html>
