@@ -355,14 +355,15 @@
 
         <!-- Tabs -->
         <div class="tabs">
-            <<button class="tab-btn active" onclick="cambiarTab('productos')">Productos</button>
+            <button class="tab-btn active" onclick="cambiarTab('productos')">Productos</button>
+<button class="tab-btn active" onclick="cambiarTab('productos')">Productos</button>
 <button class="tab-btn" onclick="cambiarTab('usuarios')">Usuarios</button>
 <button class="tab-btn" onclick="cambiarTab('ventas')">Ventas</button>
-<!-- AGREGAR ESTA LÍNEA -->
+<button class="tab-btn" onclick="cambiarTab('historial')">🪑 Historial Mesas</button>
 <button class="tab-btn" onclick="window.location.href='mesas.html'"
   style="background: linear-gradient(135deg, rgba(0,229,255,0.15), rgba(0,191,255,0.1));
          border-color: rgba(0,229,255,0.4); color: #00e5ff;">
-  🪑 Ver Mesas
+  🗺️ Ver Mesas
 </button>
         </div>
 
@@ -453,6 +454,47 @@
             </div>
         </div>
     </div>
+
+    <!-- Tab Historial Mesas -->
+<div id="tab-historial" class="tab-content">
+    <div class="action-bar">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+            <button class="btn-primary" id="filtroTodas" onclick="filtrarHistorialAdmin('TODAS')">Todas</button>
+            <button class="btn-primary" id="filtroOcupadas" onclick="filtrarHistorialAdmin('OCUPADA')"
+                style="background:linear-gradient(135deg,#ef4444,#dc2626);">🔴 Ocupadas</button>
+            <button class="btn-primary" id="filtroLibres" onclick="filtrarHistorialAdmin('LIBRE')"
+                style="background:linear-gradient(135deg,#059669,#10b981);">🟢 Libres</button>
+            <button class="btn-primary" id="filtroPagadas" onclick="filtrarHistorialAdmin('PAGADA')"
+                style="background:linear-gradient(135deg,#d97706,#f59e0b);">💰 Pagadas hoy</button>
+        </div>
+        <button class="btn-primary" onclick="cargarHistorialAdmin()">🔄 Actualizar</button>
+    </div>
+
+    <!-- Stats rápidas -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:15px;margin-bottom:20px;">
+        <div class="stat-card" style="padding:15px;">
+            <h3>Mesas Ocupadas</h3>
+            <p class="value" id="adminMesasOcupadas" style="font-size:1.8em;">0</p>
+        </div>
+        <div class="stat-card" style="padding:15px;">
+            <h3>Mesas Libres</h3>
+            <p class="value" id="adminMesasLibres" style="font-size:1.8em;">0</p>
+        </div>
+        <div class="stat-card" style="padding:15px;">
+            <h3>Consumiendo ahora</h3>
+            <p class="value" id="adminTotalConsumiendo" style="font-size:1.4em;">$0</p>
+        </div>
+        <div class="stat-card" style="padding:15px;">
+            <h3>Cobrado hoy</h3>
+            <p class="value" id="adminTotalCobradoHoy" style="font-size:1.4em;">$0</p>
+        </div>
+    </div>
+
+    <!-- Grid de mesas -->
+    <div id="historialMesasAdmin" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;">
+        <p style="color:#a0aec0;text-align:center;padding:40px;grid-column:1/-1;">Cargando historial...</p>
+    </div>
+</div>
 
     <!-- Modal Producto -->
     <div id="modalProducto" class="modal">

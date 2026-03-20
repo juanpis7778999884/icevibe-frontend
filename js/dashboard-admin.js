@@ -37,6 +37,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const nombreAdmin = document.getElementById("adminName")
   if (nombreAdmin) {
     nombreAdmin.textContent = session.nombre
+    // Agregar al final del addEventListener DOMContentLoaded:
+document.querySelector('[onclick="cambiarTab(\'historial\')"]')?.addEventListener('click', cargarHistorialAdmin)
   }
 
   cargarEstadisticas()
@@ -737,6 +739,182 @@ async function eliminarTodasLasVentas() {
   } catch (error) {
     console.error("[v0] Error al limpiar BD:", error)
     alert("Error al limpiar la base de datos: " + error.message)
+  }
+}
+// ==================== HISTORIAL MESAS ====================
+
+let historialMesasData = []
+let ventasHoyData = []
+let filtroMesaActual = 'TODAS'
+
+async function cargarHistorialAdmin() {
+  try {
+    const [mesasRes, ventasRes] = await Promise.all([
+      window.apiRequest("/mesas"),
+      window.apiRequest("/ventas")
+    ])
+
+    historialMesasData = Array.isArray(mesasRes) ? mesasRes : []
+
+    const hoy = new Date()
+    ventasHoyData = (Array.isArray(ventasRes) ? ventasRes : []).filter(v => {
+      if (!v.fechaVenta) return false
+      const fv = new Date(v.fechaVenta)
+      return fv.getDate() === hoy.getDate() &&
+             fv.getMonth() === hoy.getMonth() &&
+             fv.getFullYear() === hoy.getFullYear()
+    })
+
+    // Stats
+    const ocupadas = historialMesasData.filter(m => m.estado === 'OCUPADA')
+    const libres   = historialMesasData.filter(m => m.estado === 'LIBRE')
+    const totalConsumiendo = ocupadas.reduce((s, m) => s + parseFloat(m.totalConsumido || 0), 0)
+    const totalCobradoHoy  = ventasHoyData
+      .filter(v => v.estado === 'PAGADA')
+      .reduce((s, v) => s + parseFloat(v.total || 0), 0)
+
+    document.getElementById('adminMesasOcupadas').textContent   = ocupadas.length
+    document.getElementById('adminMesasLibres').textContent     = libres.length
+    document.getElementById('adminTotalConsumiendo').textContent = formatearMoneda(totalConsumiendo)
+    document.getElementById('adminTotalCobradoHoy').textContent  = formatearMoneda(totalCobradoHoy)
+
+    mostrarHistorialAdmin(filtroMesaActual)
+
+  } catch(e) {
+    console.error("[v0] Error cargando historial mesas:", e)
+    document.getElementById('historialMesasAdmin').innerHTML =
+      '<p style="color:#ef4444;text-align:center;padding:40px;grid-column:1/-1;">Error al cargar historial</p>'
+  }
+}
+
+function filtrarHistorialAdmin(filtro) {
+  filtroMesaActual = filtro
+  // Resaltar botón activo
+  document.getElementById('filtroTodas').style.opacity    = filtro === 'TODAS'    ? '1' : '0.5'
+  document.getElementById('filtroOcupadas').style.opacity = filtro === 'OCUPADA'  ? '1' : '0.5'
+  document.getElementById('filtroLibres').style.opacity   = filtro === 'LIBRE'    ? '1' : '0.5'
+  document.getElementById('filtroPagadas').style.opacity  = filtro === 'PAGADA'   ? '1' : '0.5'
+  mostrarHistorialAdmin(filtro)
+}
+
+function mostrarHistorialAdmin(filtro) {
+  const container = document.getElementById('historialMesasAdmin')
+  if (!container) return
+
+  let mesas = historialMesasData
+
+  if (filtro === 'OCUPADA') {
+    mesas = mesas.filter(m => m.estado === 'OCUPADA')
+  } else if (filtro === 'LIBRE') {
+    mesas = mesas.filter(m => m.estado === 'LIBRE')
+  } else if (filtro === 'PAGADA') {
+    // Mostrar ventas pagadas hoy por mesa
+    if (ventasHoyData.length === 0) {
+      container.innerHTML = '<p style="color:#a0aec0;text-align:center;padding:40px;grid-column:1/-1;">No hay mesas cobradas hoy</p>'
+      return
+    }
+    container.innerHTML = ventasHoyData
+      .filter(v => v.estado === 'PAGADA')
+      .map(v => `
+        <div style="background:linear-gradient(135deg,#1a1f3a,#1e2442);border:2px solid rgba(245,158,11,.4);border-radius:14px;padding:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <strong style="color:#f59e0b;font-size:1.1rem;">🪑 Mesa ${v.numeroMesa || 'N/A'}</strong>
+            <span style="background:rgba(245,158,11,.15);color:#f59e0b;padding:3px 10px;border-radius:20px;font-size:0.75rem;font-weight:600;">PAGADA</span>
+          </div>
+          <p style="color:#a0aec0;font-size:0.82rem;margin:4px 0;">👤 ${v.vendedor || 'N/A'}</p>
+          <p style="color:#a0aec0;font-size:0.82rem;margin:4px 0;">🕐 ${new Date(v.fechaVenta).toLocaleTimeString('es-CO', {hour:'2-digit',minute:'2-digit'})}</p>
+          <p style="color:#a0aec0;font-size:0.82rem;margin:4px 0;">📋 ${v.numeroVenta}</p>
+          <div style="display:flex;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06);">
+            <span style="color:#a0aec0;">Total cobrado</span>
+            <strong style="color:#10b981;">${formatearMoneda(v.total)}</strong>
+          </div>
+        </div>
+      `).join('')
+    return
+  }
+
+  if (mesas.length === 0) {
+    container.innerHTML = '<p style="color:#a0aec0;text-align:center;padding:40px;grid-column:1/-1;">No hay mesas en este estado</p>'
+    return
+  }
+
+  container.innerHTML = mesas.map(m => {
+    const esOcupada = m.estado === 'OCUPADA'
+    const borderColor = esOcupada ? 'rgba(239,68,68,.5)' : 'rgba(16,185,129,.4)'
+    const badgeColor  = esOcupada ? '#ef4444' : '#10b981'
+    const badgeBg     = esOcupada ? 'rgba(239,68,68,.15)' : 'rgba(16,185,129,.15)'
+
+    return `
+      <div style="background:linear-gradient(135deg,#1a1f3a,#1e2442);border:2px solid ${borderColor};border-radius:14px;padding:16px;transition:all .2s;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <strong style="color:#fff;font-size:1.2rem;">🪑 Mesa ${m.numero}</strong>
+          <span style="background:${badgeBg};color:${badgeColor};padding:3px 10px;border-radius:20px;font-size:0.75rem;font-weight:600;">${m.estado}</span>
+        </div>
+
+        ${esOcupada ? `
+          <p style="color:#a0aec0;font-size:0.82rem;margin:4px 0;">👤 ${m.meseroNombre || 'N/A'}</p>
+          <p style="color:#a0aec0;font-size:0.82rem;margin:4px 0;">⏰ Desde las ${m.horaApertura ? new Date(m.horaApertura).toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'}) : 'N/A'}</p>
+          <div style="display:flex;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06);">
+            <span style="color:#a0aec0;">Consumido</span>
+            <strong style="color:#00e5ff;">${formatearMoneda(m.totalConsumido)}</strong>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px;">
+            <button onclick="verDetalleMesaAdmin(${m.numero})"
+              style="flex:1;padding:8px;background:rgba(0,191,255,.15);border:1px solid rgba(0,191,255,.3);color:#00bfff;border-radius:8px;cursor:pointer;font-size:0.82rem;">
+              👁️ Ver detalle
+            </button>
+            <button onclick="cobrarMesaAdmin(${m.numero})"
+              style="flex:1;padding:8px;background:linear-gradient(135deg,#059669,#10b981);border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:0.82rem;font-weight:600;">
+              💳 Cobrar
+            </button>
+          </div>
+        ` : `
+          <p style="color:#10b981;font-size:0.85rem;margin-top:8px;">✓ Mesa disponible</p>
+          <button onclick="window.location.href='mesas.html'"
+            style="width:100%;margin-top:12px;padding:8px;background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3);color:#10b981;border-radius:8px;cursor:pointer;font-size:0.82rem;">
+            ➕ Abrir mesa
+          </button>
+        `}
+      </div>
+    `
+  }).join('')
+}
+
+async function verDetalleMesaAdmin(numero) {
+  try {
+    const data = await window.apiRequest(`/mesas/${numero}`)
+    if (!data.success) { alert('Error al cargar la mesa'); return }
+
+    const mesa = data.mesa
+    const productos = data.productos || []
+
+    let msg = `MESA ${numero}\n`
+    msg += `Mesero: ${mesa.meseroNombre || 'N/A'}\n`
+    msg += `Apertura: ${mesa.horaApertura ? new Date(mesa.horaApertura).toLocaleTimeString('es-CO') : 'N/A'}\n\n`
+    msg += `CONSUMO:\n`
+    productos.forEach(p => {
+      msg += `• ${p.productoNombre} x${p.cantidad} = ${formatearMoneda(p.subtotal)}\n`
+    })
+    msg += `\nTOTAL: ${formatearMoneda(data.totalConsumido)}`
+    alert(msg)
+  } catch(e) {
+    alert('Error: ' + e.message)
+  }
+}
+
+async function cobrarMesaAdmin(numero) {
+  if (!confirm(`¿Confirmar cobro y liberar Mesa ${numero}?`)) return
+  try {
+    const res = await window.apiRequest(`/mesas/${numero}/liberar`, { method: 'POST' })
+    if (res.success) {
+      alert(`✅ Mesa ${numero} cobrada y liberada`)
+      cargarHistorialAdmin()
+      cargarEstadisticas()
+    } else {
+      alert('Error: ' + res.message)
+    }
+  } catch(e) {
+    alert('Error: ' + e.message)
   }
 }
 
