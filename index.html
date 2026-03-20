@@ -14,28 +14,66 @@
           <p>Sistema de Punto de Venta</p>
         </div>
 
-        <form id="loginForm" class="login-form">
+        <!-- TABS -->
+        <div class="login-tabs">
+          <button class="login-tab active" onclick="cambiarLoginTab('normal', this)">🔑 Usuario</button>
+          <button class="login-tab" onclick="cambiarLoginTab('pin', this)">🔢 PIN</button>
+        </div>
+
+        <!-- LOGIN NORMAL -->
+        <div id="loginNormal">
+          <form id="loginForm" class="login-form">
+            <div class="form-group">
+              <label for="username">Código de Usuario</label>
+              <input type="text" id="username" placeholder="Ej: GER001, VEN001" required />
+            </div>
+            <div class="form-group">
+              <label for="password">Contraseña</label>
+              <input type="password" id="password" placeholder="Ingresa tu contraseña" required />
+            </div>
+            <div id="errorMessage" class="error-message"></div>
+            <button type="submit" class="btn-login">Iniciar Sesión</button>
+            <div style="text-align:center;margin-top:15px;">
+              <button type="button" class="btn-recover-password" onclick="mostrarModalRecuperacion()">
+                ¿Olvidaste tu contraseña?
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- LOGIN PIN -->
+        <div id="loginPin" style="display:none;">
           <div class="form-group">
-            <label for="username">Código de Usuario</label>
-            <input type="text" id="username" placeholder="Ej: GER001, VEN001" required />
+            <label>Selecciona tu usuario</label>
+            <select id="pinUsuarioSelect" class="pin-usuario-select">
+              <option value="">Cargando usuarios...</option>
+            </select>
           </div>
 
-          <div class="form-group">
-            <label for="password">Contraseña</label>
-            <input type="password" id="password" placeholder="Ingresa tu contraseña" required />
+          <div class="pin-display">
+            <div class="pin-dot" id="dot0"></div>
+            <div class="pin-dot" id="dot1"></div>
+            <div class="pin-dot" id="dot2"></div>
+            <div class="pin-dot" id="dot3"></div>
           </div>
 
-          <div id="errorMessage" class="error-message"></div>
+          <div id="pinError" class="pin-error"></div>
 
-          <button type="submit" class="btn-login">Iniciar Sesión</button>
-          
-          <!-- Added password recovery link -->
-          <div style="text-align: center; margin-top: 15px;">
-            <button type="button" class="btn-recover-password" onclick="mostrarModalRecuperacion()">
-              ¿Olvidaste tu contraseña?
-            </button>
+          <div class="pin-pad">
+            <button class="pin-btn" onclick="pinPresionar('1')">1</button>
+            <button class="pin-btn" onclick="pinPresionar('2')">2</button>
+            <button class="pin-btn" onclick="pinPresionar('3')">3</button>
+            <button class="pin-btn" onclick="pinPresionar('4')">4</button>
+            <button class="pin-btn" onclick="pinPresionar('5')">5</button>
+            <button class="pin-btn" onclick="pinPresionar('6')">6</button>
+            <button class="pin-btn" onclick="pinPresionar('7')">7</button>
+            <button class="pin-btn" onclick="pinPresionar('8')">8</button>
+            <button class="pin-btn" onclick="pinPresionar('9')">9</button>
+            <button class="pin-btn empty" disabled></button>
+            <button class="pin-btn" onclick="pinPresionar('0')">0</button>
+            <button class="pin-btn delete" onclick="pinBorrar()">⌫</button>
           </div>
-        </form>
+        </div>
 
         <div class="login-footer">
           <p>Usuarios de prueba:</p>
@@ -48,39 +86,111 @@
       </div>
     </div>
 
-    <!-- Added password recovery modal -->
+    <!-- Modal recuperación -->
     <div id="modalRecuperacion" class="modal">
-      <div class="modal-content" style="max-width: 400px;">
+      <div class="modal-content" style="max-width:400px;">
         <div class="modal-header">
           <h2>Recuperar Contraseña</h2>
           <button class="modal-close" onclick="cerrarModalRecuperacion()">&times;</button>
         </div>
-        
         <div class="form-group">
           <label>Código de Usuario</label>
           <input type="text" id="codigoRecuperacion" class="form-input" placeholder="Ej: ADMIN, GER001" required />
         </div>
-        
         <div class="form-group">
           <label>Email Registrado</label>
           <input type="email" id="emailRecuperacion" class="form-input" placeholder="tu@email.com" required />
         </div>
-        
         <div id="recoveryMessage" class="recovery-message"></div>
-        
         <div class="form-actions">
           <button type="button" class="btn-secondary" onclick="cerrarModalRecuperacion()">Cancelar</button>
           <button type="button" class="btn-primary" onclick="enviarRecuperacion()">Enviar Instrucciones</button>
         </div>
-        
-        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--cyan); text-align: center; font-size: 12px; color: var(--text-gray);">
+        <div style="margin-top:15px;padding-top:15px;border-top:1px solid var(--ice-cyan);text-align:center;font-size:12px;color:var(--text-gray);">
           <p>Contacta con el administrador si no tienes acceso a tu email</p>
         </div>
       </div>
     </div>
 
-    <!-- Cargar config.js primero, luego auth.js, luego otros scripts -->
     <script src="js/config.js"></script>
     <script src="js/auth.js"></script>
+    <script>
+      let pinActual = ''
+
+      function cambiarLoginTab(tab, el) {
+        document.querySelectorAll('.login-tab').forEach(b => b.classList.remove('active'))
+        el.classList.add('active')
+        document.getElementById('loginNormal').style.display = tab === 'normal' ? 'block' : 'none'
+        document.getElementById('loginPin').style.display    = tab === 'pin'    ? 'block' : 'none'
+        if (tab === 'pin') cargarUsuariosPin()
+      }
+
+      async function cargarUsuariosPin() {
+        const select = document.getElementById('pinUsuarioSelect')
+        try {
+          const res = await window.apiRequest('/usuarios')
+          const usuarios = Array.isArray(res) ? res : []
+          select.innerHTML = '<option value="">— Selecciona tu usuario —</option>' +
+            usuarios.filter(u => u.activo).map(u =>
+              `<option value="${u.codigo}">${u.nombre} (${u.rol})</option>`
+            ).join('')
+        } catch(e) {
+          select.innerHTML = '<option value="">Error cargando usuarios</option>'
+        }
+      }
+
+      function pinPresionar(num) {
+        if (pinActual.length >= 4) return
+        pinActual += num
+        actualizarDots()
+        if (pinActual.length === 4) setTimeout(verificarPin, 200)
+      }
+
+      function pinBorrar() {
+        pinActual = pinActual.slice(0, -1)
+        actualizarDots()
+        document.getElementById('pinError').textContent = ''
+      }
+
+      function actualizarDots() {
+        for (let i = 0; i < 4; i++) {
+          document.getElementById(`dot${i}`).classList.toggle('filled', i < pinActual.length)
+        }
+      }
+
+      async function verificarPin() {
+        const codigoUsuario = document.getElementById('pinUsuarioSelect').value
+        if (!codigoUsuario) {
+          document.getElementById('pinError').textContent = 'Selecciona un usuario primero'
+          pinActual = ''
+          actualizarDots()
+          return
+        }
+        try {
+          const result = await login(codigoUsuario, pinActual)
+          if (!result.success) {
+            document.getElementById('pinError').textContent = '❌ PIN incorrecto'
+            const dots = document.querySelectorAll('.pin-dot')
+            dots.forEach(d => { d.style.borderColor = '#ef4444'; d.style.background = '#ef4444' })
+            setTimeout(() => {
+              pinActual = ''
+              actualizarDots()
+              dots.forEach(d => { d.style.borderColor = ''; d.style.background = '' })
+              document.getElementById('pinError').textContent = ''
+            }, 800)
+          }
+        } catch(e) {
+          document.getElementById('pinError').textContent = 'Error al verificar PIN'
+          pinActual = ''
+          actualizarDots()
+        }
+      }
+
+      document.addEventListener('keydown', e => {
+        if (document.getElementById('loginPin').style.display === 'none') return
+        if (e.key >= '0' && e.key <= '9') pinPresionar(e.key)
+        if (e.key === 'Backspace') pinBorrar()
+      })
+    </script>
   </body>
 </html>

@@ -1821,3 +1821,165 @@ body {
     font-size: 22px;
   }
 }
+/* ==================== LOGIN PIN ==================== */
+.login-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 24px;
+  background: rgba(255,255,255,.05);
+  border-radius: 10px;
+  padding: 4px;
+}
+
+.login-tab {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  background: transparent;
+  color: #a0aec0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 600;
+  transition: all .2s;
+}
+
+.login-tab.active {
+  background: rgba(0,191,255,.2);
+  color: #00e5ff;
+}
+
+.pin-display {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.pin-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(0,191,255,.4);
+  background: transparent;
+  transition: all .2s;
+}
+
+.pin-dot.filled {
+  background: #00e5ff;
+  border-color: #00e5ff;
+  box-shadow: 0 0 8px rgba(0,229,255,.6);
+}
+
+.pin-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  max-width: 260px;
+  margin: 0 auto 16px;
+}
+
+.pin-btn {
+  padding: 16px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 12px;
+  color: #fff;
+  font-size: 1.3rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .15s;
+  text-align: center;
+}
+
+.pin-btn:hover {
+  background: rgba(0,191,255,.15);
+  border-color: rgba(0,191,255,.4);
+  color: #00e5ff;
+}
+
+.pin-btn:active {
+  transform: scale(.93);
+}
+
+.pin-btn.delete {
+  color: #ef4444;
+  border-color: rgba(239,68,68,.2);
+  font-size: 1rem;
+}
+
+.pin-btn.delete:hover {
+  background: rgba(239,68,68,.1);
+  border-color: rgba(239,68,68,.4);
+}
+
+.pin-btn.empty {
+  background: transparent;
+  border-color: transparent;
+  cursor: default;
+  pointer-events: none;
+}
+
+.pin-usuario-select {
+  width: 100%;
+  padding: 10px 14px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(0,191,255,.3);
+  border-radius: 10px;
+  color: #fff;
+  font-size: 0.9rem;
+  margin-bottom: 20px;
+  appearance: none;
+}
+
+.pin-usuario-select option {
+  background: #1a1f3a;
+  color: #fff;
+}
+
+.pin-error {
+  text-align: center;
+  color: #ef4444;
+  font-size: 0.82rem;
+  margin-bottom: 8px;
+  min-height: 20px;
+}
+
+.btn-recover-password {
+  background: none;
+  border: none;
+  color: var(--text-gray);
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: underline;
+  transition: color .2s;
+}
+
+.btn-recover-password:hover {
+  color: var(--ice-cyan);
+}
+
+.recovery-message {
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  display: none;
+}
+
+.recovery-message.show {
+  display: block;
+}
+
+.recovery-message.success {
+  background: rgba(16,185,129,.15);
+  border: 1px solid #10b981;
+  color: #10b981;
+}
+
+.recovery-message.error {
+  background: rgba(239,68,68,.15);
+  border: 1px solid #ef4444;
+  color: #ef4444;
+}
