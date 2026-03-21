@@ -128,7 +128,7 @@
       async function cargarUsuariosPin() {
         const select = document.getElementById('pinUsuarioSelect')
         try {
-          const res = await window.apiRequest('/usuarios')
+      const res = await window.apiRequest('/usuarios/publico')
           const usuarios = Array.isArray(res) ? res : []
           select.innerHTML = '<option value="">— Selecciona tu usuario —</option>' +
             usuarios.filter(u => u.activo).map(u =>
