@@ -860,7 +860,11 @@
       msg += `\n━━━━━━━━━━━━━━━━\n💰 *TOTAL: ${fmt(totalFinal)}*\n\n¡Gracias! 🎉`
 
       const tel = window.API_CONFIG.WHATSAPP_NUMBER.replace(/\D/g, '')
-      window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, '_blank')
+      const waUrl = `whatsapp://send?phone=${tel}&text=${encodeURIComponent(msg)}`
+const waWeb = `https://wa.me/${tel}?text=${encodeURIComponent(msg)}`
+// Intenta abrir la app directamente, si falla usa web
+window.location.href = waUrl
+setTimeout(() => { window.open(waWeb, '_blank') }, 1500)
       if (carrito.length > 0) await posRegistrarVentaSilenciosa()
     }
 
