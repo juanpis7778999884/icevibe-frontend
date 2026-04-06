@@ -1983,3 +1983,205 @@ body {
   border: 1px solid #ef4444;
   color: #ef4444;
 }
+
+/* ==================== RESPONSIVE MESERO ==================== */
+@media (max-width: 768px) {
+
+  /* Ocultar sidebar en móvil */
+  .pos-sidebar {
+    display: none;
+  }
+
+  /* Contenedor principal ocupa todo */
+  .pos-container {
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .pos-main {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Header compacto */
+  .pos-header {
+    padding: 10px 14px;
+  }
+
+  .menu-title {
+    font-size: 1.1rem;
+  }
+
+  /* Layout vertical: productos arriba, carrito abajo */
+  .pos-wrapper {
+    flex-direction: column;
+    overflow: hidden;
+    flex: 1;
+  }
+
+  /* Productos ocupa 60% */
+  .pos-products-section {
+    flex: 0 0 58%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Categorías compactas */
+  .pos-categories {
+    padding: 8px 12px;
+    gap: 6px;
+  }
+
+  .category-btn {
+    padding: 6px 12px;
+    font-size: 11px;
+  }
+
+  /* Grid de productos más pequeño */
+  .product-grid {
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: 8px;
+    padding: 10px 12px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .product-card {
+    padding: 10px 8px;
+    min-height: 120px;
+    border-radius: 10px;
+  }
+
+  .product-icon {
+    font-size: 28px;
+  }
+
+  .product-name {
+    font-size: 11px;
+  }
+
+  .product-price {
+    font-size: 13px;
+  }
+
+  /* Carrito ocupa 42% */
+  .order-summary {
+    flex: 0 0 42%;
+    width: 100%;
+    border-left: none;
+    border-top: 2px solid var(--ice-blue);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .order-header {
+    padding: 8px 14px;
+  }
+
+  .order-header h2 {
+    font-size: 0.9rem;
+  }
+
+  .order-items {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 12px;
+  }
+
+  .order-item {
+    padding: 8px 10px;
+    margin-bottom: 6px;
+  }
+
+  .order-item-name {
+    font-size: 12px;
+  }
+
+  .order-item-price {
+    font-size: 11px;
+  }
+
+  .qty-btn {
+    width: 24px;
+    height: 24px;
+    font-size: 14px;
+  }
+
+  .qty-number {
+    font-size: 13px;
+  }
+
+  .order-total {
+    padding: 8px 14px;
+  }
+
+  .total-row {
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+
+  .total-final {
+    font-size: 16px;
+  }
+
+  .btn-complete-order {
+    padding: 10px;
+    font-size: 13px;
+    margin-top: 6px;
+  }
+
+  /* Barra de navegación inferior para móvil */
+  .pos-mobile-nav {
+    display: flex !important;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(135deg, #050814, #0a0e27);
+    border-top: 2px solid var(--ice-blue);
+    z-index: 500;
+    padding: 6px 0;
+  }
+
+  /* Empujar contenido para que no quede detrás del nav */
+  .pos-main {
+    padding-bottom: 60px;
+  }
+}
+
+/* Nav móvil oculto en escritorio */
+.pos-mobile-nav {
+  display: none;
+}
+
+.pos-mobile-nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-gray);
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all .2s;
+}
+
+.pos-mobile-nav-btn:hover,
+.pos-mobile-nav-btn.active {
+  color: var(--ice-cyan);
+}
+
+.pos-mobile-nav-btn span:first-child {
+  font-size: 20px;
+}
