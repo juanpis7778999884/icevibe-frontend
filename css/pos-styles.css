@@ -2185,3 +2185,31 @@ body {
 .pos-mobile-nav-btn span:first-child {
   font-size: 20px;
 }
+
+@media (max-width: 768px) {
+  .btn-complete-order {
+    display: block !important;
+    width: calc(100% - 24px);
+    margin: 0 12px 6px;
+    padding: 12px;
+    font-size: 13px;
+  }
+
+  .order-total {
+    padding: 6px 12px;
+  }
+
+  .total-row {
+    font-size: 11px;
+    margin-bottom: 2px;
+  }
+
+  /* Hacer el carrito un poco más grande */
+  .order-summary {
+    flex: 0 0 46% !important;
+  }
+
+  .pos-products-section {
+    flex: 0 0 54% !important;
+  }
+}
